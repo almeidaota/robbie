@@ -3,7 +3,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from robbie.activate import _count_words, next_session_id
+from robbie.activate import (
+    _count_words,
+    _has_wrap_marker,
+    _strip_wrap_marker,
+    next_session_id,
+)
 
 
 class TestActivateHelpers(unittest.TestCase):
@@ -11,6 +16,11 @@ class TestActivateHelpers(unittest.TestCase):
         self.assertEqual(_count_words("hello there friend"), 3)
         self.assertEqual(_count_words("  spaced   out  "), 2)
         self.assertEqual(_count_words(""), 0)
+
+    def test_wrap_marker_detection(self):
+        self.assertTrue(_has_wrap_marker("ok, done\n<wrap_up>"))
+        self.assertFalse(_has_wrap_marker("ok, done"))
+        self.assertEqual(_strip_wrap_marker("bye\n<wrap_up>"), "bye\n")
 
     def test_next_session_id_counts_existing(self):
         with TemporaryDirectory() as tmp:

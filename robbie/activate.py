@@ -87,9 +87,10 @@ def activate() -> int:
             history.append({"role": "user", "content": line})
 
             reply_parts: list[str] = []
+            want_wrap_up = False
 
             def render():
-                text = "".join(reply_parts) or "_…_"
+                text = _strip_wrap_marker("".join(reply_parts)) or "_…_"
                 return Markdown(f"**robbie>** {text}")
 
             live = Live(
@@ -103,15 +104,23 @@ def activate() -> int:
                 for chunk in llm.chat_stream(history):
                     reply_parts.append(chunk)
                     live.update(render())
+                    if _has_wrap_marker("".join(reply_parts)):
+                        want_wrap_up = True
+                        break
             except LLMError as exc:
                 live.stop()
                 console.print(f"\n[red]robbie:[/] {exc}")
                 return 1
+            reply = _strip_wrap_marker("".join(reply_parts)).strip()
+            live.update(Markdown(f"**robbie>** {reply or '_…_'}"))
             live.stop()
-            if not reply_parts:
+            if not reply:
                 console.print("[dim]robbie> (no reply)[/]")
-            history.append({"role": "assistant", "content": "".join(reply_parts)})
+            if reply:
+                history.append({"role": "assistant", "content": reply})
             console.print()
+            if want_wrap_up:
+                break
 
         return _wrap_up(coach, db, history, session_id, user_words)
     finally:
@@ -163,3 +172,14 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
 
 def _count_words(text: str) -> int:
     return len(text.split())
+
+
+WRAP_MARKER = "<wrap_up>"
+
+
+def _has_wrap_marker(text: str) -> bool:
+    return WRAP_MARKER in text
+
+
+def _strip_wrap_marker(text: str) -> str:
+    return text.replace(WRAP_MARKER, "")

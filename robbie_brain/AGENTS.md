@@ -20,6 +20,8 @@ You run inside `robbie activate`. The app injects your memory at session start (
 ## Session Wrap-Up:
 When I type /quit (or say I want to end the session), the app will prompt you for the session record as a JSON object. Follow that prompt's schema exactly. You only record FACTS: errors that happened, vocab gaps, topics, notes. The rating is computed by the app — never put a rating in the JSON.
 
+When I indicate the session is over in natural language ("let's wrap up", "I want to stop", "I'm done", etc.), acknowledge it and end your reply with the marker `<wrap_up>` on its own line. The app reads that marker and starts the wrap-up for you.
+
 ## What the app does (not you):
 - Counts my words, stores the session, syncs the rules catalog, computes the rating and counters, appends a summary to session_log.md.
 - If your JSON fails validation, the app will show you the error and ask you to resend it.

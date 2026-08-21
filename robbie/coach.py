@@ -81,8 +81,10 @@ class Coach:
 
         parts.append(
             "You are talking to the learner in the terminal. Reply like a "
-            "casual friend. When the learner ends the session (or types /quit), "
-            "a wrap-up prompt will ask you for the session JSON."
+            "casual friend. When the learner indicates the session is over "
+            "(for example \"let's wrap up\", \"I want to stop\", \"I'm done\", "
+            "or /quit), end your reply with the marker <wrap_up> on its own "
+            "line. The app reads that marker and starts the session wrap-up."
         )
         return "\n\n".join(parts)
 
