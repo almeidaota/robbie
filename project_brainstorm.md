@@ -181,3 +181,21 @@ Goal: anyone with an LLM key can run the coach free. Site is the front door
 - [ ] Add `language` field to schema for the language-agnostic version (Italian friend).
 - [ ] Sketch the Portuguese-transfer knowledge base content.
 - [ ] Decide license (MIT vs GPL) when the repo gets created.
+
+## Bootstrapping the Coach Memory
+
+Onboarding idea (not built yet): on the very first `robbie activate` session,
+the coach should bootstrap itself:
+
+- If `profile.md`, `common_mistakes.md`, or `session_log.md` don't exist yet,
+  create them from the `*.example.md` templates.
+- Interview the user a bit — ask things about them (name, native language,
+  level, interests, goals, pet peeves about correction style) and write the
+  answers into `profile.md`.
+- Keep the profile alive: every now and then (and whenever the user shares
+  something new about themselves in a session), the coach updates `profile.md`
+  with the new information.
+
+The point: first-run experience should be zero-config for the user, and the
+profile should stay a living document instead of going stale.
+
