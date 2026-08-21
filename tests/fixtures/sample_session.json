@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "language": "en",
+  "session_id": "2026-08-21-01",
+  "date": "2026-08-21",
+  "topics": ["schema design", "parser"],
+  "notes": "Session where we sketched the schema.",
+  "errors": [
+    {
+      "rule_id": 2,
+      "type": "transfer",
+      "quote": "store the file into a database",
+      "fix": "store the file in a database",
+      "self_caught": false,
+      "count": 5
+    },
+    {
+      "rule_id": 11,
+      "type": "grammar",
+      "quote": "we're talking for a week",
+      "fix": "we've been talking for a week",
+      "self_caught": false
+    },
+    {
+      "rule_id": 19,
+      "type": "transfer",
+      "quote": "I fell off the bed this night",
+      "fix": "I fell off the bed last night",
+      "self_caught": true
+    },
+    {
+      "rule_id": 6,
+      "type": "typo",
+      "quote": "tipical",
+      "fix": "typical",
+      "self_caught": false
+    }
+  ],
+  "vocab_gaps": [
+    {
+      "l1_word": "substituir",
+      "target_word": "replace",
+      "context": "I need to (substituir?) that line",
+      "date": "2026-08-21"
+    }
+  ]
+}
