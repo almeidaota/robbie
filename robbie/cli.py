@@ -1,20 +1,47 @@
-"""CLI for Robbie's storage: load session files into MongoDB and query them.
+"""CLI for Robbie: the English coach.
 
 Usage:
-  python -m robbie.cli load [sessions/...]
-  python -m robbie.cli show
+  robbie activate     start an interactive coach session
+  robbie setup        write your LLM config (~/.config/robbie/config.toml)
+  robbie show         dashboard: sessions, ratings, errors per 100 words
+  robbie load         load session files into MongoDB
+  robbie rules        sync rules catalog into MongoDB
 """
 
 import argparse
+import getpass
 import sys
 from pathlib import Path
 
-from .parser import SchemaError, parse_session_file
+from .activate import activate
+from .config import DEFAULT_BASE_URL, DEFAULT_MODEL, ConfigError, write_config
 from .db import DBError, RobbieDB
+from .parser import SchemaError, parse_session_file
+
+
+def cmd_activate(args) -> int:
+    return activate()
+
+
+def cmd_setup(args) -> int:
+    print(f"Writing config to ~/.config/robbie/config.toml")
+    api_key = getpass.getpass("LLM API key: ").strip()
+    if not api_key:
+        print("robbie: no key given, aborting", file=sys.stderr)
+        return 1
+    base_url = input(f"API base URL [{DEFAULT_BASE_URL}]: ").strip() or DEFAULT_BASE_URL
+    model = input(f"Model [{DEFAULT_MODEL}]: ").strip() or DEFAULT_MODEL
+    try:
+        path = write_config(api_key, base_url, model)
+    except OSError as exc:
+        print(f"robbie: could not write config: {exc}", file=sys.stderr)
+        return 1
+    print(f"saved {path} (chmod 600)")
+    return 0
 
 
 def cmd_load(args) -> int:
-    store = RobbieDB()
+    db = RobbieDB()
     paths = args.files or sorted(Path("sessions").glob("*.json"))
     loaded = 0
     for p in paths:
@@ -23,44 +50,50 @@ def cmd_load(args) -> int:
         except SchemaError as exc:
             print(f"SKIP {p}: {exc}", file=sys.stderr)
             continue
-        store.upsert_session(session)
+        db.upsert_session(session)
         print(f"loaded {p} ({session.session_id}, rating {session.rating():.1f})")
         loaded += 1
-    store.close()
+    db.close()
     return 0
 
 
 def cmd_show(args) -> int:
-    store = RobbieDB()
+    db = RobbieDB()
     print(f"{'session':<14} {'date':<12} {'words':>5} {'rating':>6} {'err/100w':>9}  topics")
     print("-" * 72)
-    for s in store.all_sessions():
+    for s in db.all_sessions():
         per_100 = s.errors_per_100_words()
         per_100_s = f"{per_100:.2f}" if per_100 is not None else "—"
         print(f"{s.session_id:<14} {s.date:<12} {s.word_count:>5} {s.rating():>6.1f} {per_100_s:>9}  {', '.join(s.topics)}")
     print("-" * 72)
-    print("lifetime counts by rule:", store.counts_by_rule())
-    print("lifetime counts by type:", store.counts_by_type())
-    store.close()
+    print("lifetime counts by rule:", db.counts_by_rule())
+    print("lifetime counts by type:", db.counts_by_type())
+    db.close()
     return 0
 
 
 def cmd_rules(args) -> int:
-    store = RobbieDB()
-    summary = store.sync_rules(args.file)
+    db = RobbieDB()
+    summary = db.sync_rules(args.file)
     print(f"synced {summary['rules']} rules from {args.file}")
     orphans = summary["orphan_rule_ids"]
     if orphans:
         print(f"WARNING: rule_ids in errors without a catalog entry: {', '.join(orphans)}")
     else:
         print("all rule_ids in errors have a catalog entry")
-    store.close()
+    db.close()
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="robbie")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_activate = sub.add_parser("activate", help="start an interactive coach session")
+    p_activate.set_defaults(func=cmd_activate)
+
+    p_setup = sub.add_parser("setup", help="write your LLM config")
+    p_setup.set_defaults(func=cmd_setup)
 
     p_load = sub.add_parser("load", help="load session files into MongoDB")
     p_load.add_argument("files", nargs="*", help="session JSON files (default: sessions/*.json)")
@@ -81,8 +114,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         return args.func(args)
-    except DBError as exc:
-        print(exc, file=sys.stderr)
+    except (DBError, ConfigError) as exc:
+        print(f"robbie: {exc}", file=sys.stderr)
         return 1
 
 

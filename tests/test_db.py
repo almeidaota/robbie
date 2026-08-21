@@ -25,7 +25,7 @@ def make_session(session_id="2026-08-21-01", with_errors=True):
 class TestRobbieDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.store = RobbieDB()
+        cls.store = RobbieDB(db_name="robbie_test")
 
     @classmethod
     def tearDownClass(cls):
