@@ -4,7 +4,12 @@
 */common_mistakes.md
 sessions/
 
+# Secrets — keys live in env vars or ~/.config/robbie/config.toml, never here
+.env
+.env.*
+
 # Python
 __pycache__/
 *.pyc
 .venv/
+*.egg-info/
