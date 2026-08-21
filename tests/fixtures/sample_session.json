@@ -11,8 +11,35 @@
       "type": "transfer",
       "quote": "store the file into a database",
       "fix": "store the file in a database",
-      "self_caught": false,
-      "count": 5
+      "self_caught": false
+    },
+    {
+      "rule_id": 2,
+      "type": "transfer",
+      "quote": "thinking in making",
+      "fix": "thinking about making",
+      "self_caught": false
+    },
+    {
+      "rule_id": 2,
+      "type": "transfer",
+      "quote": "responsible on",
+      "fix": "responsible for",
+      "self_caught": false
+    },
+    {
+      "rule_id": 2,
+      "type": "transfer",
+      "quote": "change on it",
+      "fix": "change about it",
+      "self_caught": false
+    },
+    {
+      "rule_id": 2,
+      "type": "transfer",
+      "quote": "every end of session",
+      "fix": "at the end of every session",
+      "self_caught": false
     },
     {
       "rule_id": 11,

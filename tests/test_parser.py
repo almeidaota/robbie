@@ -18,7 +18,7 @@ class TestParseSession(unittest.TestCase):
         self.assertEqual(session.schema_version, 1)
         self.assertEqual(session.language, "en")
         self.assertEqual(session.topics, ["schema design", "parser"])
-        self.assertEqual(len(session.errors), 4)
+        self.assertEqual(len(session.errors), 8)
         self.assertEqual(len(session.vocab_gaps), 1)
 
     def test_error_fields(self):
@@ -29,7 +29,7 @@ class TestParseSession(unittest.TestCase):
         self.assertEqual(first.quote, "store the file into a database")
         self.assertEqual(first.fix, "store the file in a database")
         self.assertFalse(first.self_caught)
-        self.assertEqual(first.count, 5)
+        self.assertEqual(len([e for e in session.errors if e.rule_id == "2"]), 5)
 
     def test_vocab_gap_fields(self):
         session = parse_session_file(FIXTURE)
@@ -72,15 +72,6 @@ class TestParseSession(unittest.TestCase):
                 "session_id": "x",
                 "date": "d",
                 "errors": [{"rule_id": 1, "type": "nah", "quote": "q", "fix": "f"}],
-            })
-
-    def test_bad_count(self):
-        with self.assertRaises(SchemaError):
-            parse_session({
-                "schema_version": 1,
-                "session_id": "x",
-                "date": "d",
-                "errors": [{"rule_id": 1, "type": "typo", "quote": "q", "fix": "f", "count": 0}],
             })
 
     def test_non_boolean_self_caught(self):
@@ -141,7 +132,7 @@ class TestRating(unittest.TestCase):
             "schema_version": 1,
             "session_id": "rough",
             "date": "2026-08-21",
-            "errors": [{"rule_id": 2, "type": "grammar", "quote": "q", "fix": "f", "count": 20}],
+            "errors": [{"rule_id": 2, "type": "grammar", "quote": "q", "fix": "f"}] * 20,
         })
         self.assertEqual(session.rating(), 0.0)
 
@@ -169,22 +160,6 @@ class TestRating(unittest.TestCase):
             "errors": [{"rule_id": 11, "type": "grammar", "quote": "q", "fix": "f", "self_caught": True}],
         })
         self.assertEqual(self_caught.rating(), 9.5)
-
-    def test_count_multiplies_penalty(self):
-        one = parse_session({
-            "schema_version": 1,
-            "session_id": "x",
-            "date": "d",
-            "errors": [{"rule_id": 2, "type": "transfer", "quote": "q", "fix": "f"}],
-        })
-        three = parse_session({
-            "schema_version": 1,
-            "session_id": "x",
-            "date": "d",
-            "errors": [{"rule_id": 2, "type": "transfer", "quote": "q", "fix": "f", "count": 3}],
-        })
-        self.assertEqual(one.rating(), 9.4)
-        self.assertEqual(three.rating(), 8.2)
 
 
 class TestCounters(unittest.TestCase):

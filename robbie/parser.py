@@ -42,13 +42,12 @@ class ErrorEntry:
     quote: str
     fix: str
     self_caught: bool = False
-    count: int = 1
 
     def penalty(self) -> float:
         weight = WEIGHTS[self.type]
         if self.self_caught:
             weight *= SELF_CAUGHT_FACTOR
-        return weight * self.count
+        return weight
 
 
 @dataclass
@@ -78,13 +77,13 @@ class Session:
     def counts_by_rule(self) -> dict[str, int]:
         counts: dict[str, int] = {}
         for e in self.errors:
-            counts[e.rule_id] = counts.get(e.rule_id, 0) + e.count
+            counts[e.rule_id] = counts.get(e.rule_id, 0) + 1
         return counts
 
     def counts_by_type(self) -> dict[str, int]:
         counts: dict[str, int] = {}
         for e in self.errors:
-            counts[e.type] = counts.get(e.type, 0) + e.count
+            counts[e.type] = counts.get(e.type, 0) + 1
         return counts
 
 
@@ -146,10 +145,6 @@ def _parse_error(raw: Any, index: int) -> ErrorEntry:
             f"errors[{index}].type must be one of {SUPPORTED_TYPES}, got {etype!r}"
         )
 
-    count = raw.get("count", 1)
-    if not isinstance(count, int) or count < 1:
-        raise SchemaError(f"errors[{index}].count must be a positive integer, got {count!r}")
-
     self_caught = raw.get("self_caught", False)
     if not isinstance(self_caught, bool):
         raise SchemaError(f"errors[{index}].self_caught must be a boolean")
@@ -160,7 +155,6 @@ def _parse_error(raw: Any, index: int) -> ErrorEntry:
         quote=str(_require(raw, "quote")),
         fix=str(_require(raw, "fix")),
         self_caught=self_caught,
-        count=count,
     )
 
 
