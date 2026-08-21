@@ -87,8 +87,13 @@ def activate() -> int:
             history.append({"role": "user", "content": line})
 
             reply_parts: list[str] = []
+
+            def render():
+                text = "".join(reply_parts) or "_…_"
+                return Markdown(f"**robbie>** {text}")
+
             live = Live(
-                Markdown("_…_"),
+                render(),
                 console=console,
                 refresh_per_second=15,
                 vertical_overflow="visible",
@@ -97,14 +102,14 @@ def activate() -> int:
             try:
                 for chunk in llm.chat_stream(history):
                     reply_parts.append(chunk)
-                    live.update(Markdown("".join(reply_parts)))
+                    live.update(render())
             except LLMError as exc:
                 live.stop()
                 console.print(f"\n[red]robbie:[/] {exc}")
                 return 1
             live.stop()
             if not reply_parts:
-                console.print("[dim]robbie: (no reply)[/]")
+                console.print("[dim]robbie> (no reply)[/]")
             history.append({"role": "assistant", "content": "".join(reply_parts)})
             console.print()
 
