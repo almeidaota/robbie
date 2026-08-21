@@ -24,7 +24,7 @@ def cmd_activate(args) -> int:
 
 
 MODELS_BY_PROVIDER = {
-    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
+    "deepseek": ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
     "openrouter": ["deepseek/deepseek-chat", "anthropic/claude-3.5-sonnet", "openai/gpt-4o-mini"],
 }

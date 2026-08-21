@@ -14,19 +14,22 @@ def pick(*inputs):
 
 class TestPickModel(unittest.TestCase):
     def test_deepseek_options(self):
-        self.assertEqual(MODELS_BY_PROVIDER["deepseek"], ["deepseek-chat", "deepseek-reasoner"])
+        self.assertEqual(
+            MODELS_BY_PROVIDER["deepseek"],
+            ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
+        )
 
     def test_defaults_to_first(self):
-        self.assertEqual(pick(""), "deepseek-chat")
+        self.assertEqual(pick(""), "deepseek-v4-flash")
 
     def test_selects_by_number(self):
-        self.assertEqual(pick("2"), "deepseek-reasoner")
+        self.assertEqual(pick("3"), "deepseek-reasoner")
 
     def test_custom_option(self):
-        self.assertEqual(pick("3", "my-model"), "my-model")
+        self.assertEqual(pick("4", "my-model"), "my-model")
 
     def test_invalid_then_valid(self):
-        self.assertEqual(pick("9", ""), "deepseek-chat")
+        self.assertEqual(pick("9", ""), "deepseek-v4-flash")
 
     def test_unknown_provider_falls_back_to_input(self):
         out = io.StringIO()

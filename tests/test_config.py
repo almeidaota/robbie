@@ -30,7 +30,7 @@ class TestConfig(unittest.TestCase):
             cfg = Path(tmp) / "config.toml"
             cfg.write_text('[llm]\napi_key = "sk-test"\n', encoding="utf-8")
             config = load_config(cfg)
-            self.assertEqual(config.model, "deepseek-chat")
+            self.assertEqual(config.model, "deepseek-v4-flash")
             self.assertTrue(config.base_url.startswith("https://"))
 
     def test_write_config_round_trip(self):
