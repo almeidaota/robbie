@@ -23,6 +23,45 @@ def cmd_activate(args) -> int:
     return activate()
 
 
+MODELS_BY_PROVIDER = {
+    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
+    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
+    "openrouter": ["deepseek/deepseek-chat", "anthropic/claude-3.5-sonnet", "openai/gpt-4o-mini"],
+}
+
+
+def _pick_model(base_url: str) -> str:
+    """Offer a numbered model picker; fall back to free text for unknown providers."""
+    options = None
+    for provider, models in MODELS_BY_PROVIDER.items():
+        if provider in base_url.lower():
+            options = models
+            break
+    if options is None:
+        return input(f"Model [{DEFAULT_MODEL}]: ").strip() or DEFAULT_MODEL
+
+    print("\nSelect a model:")
+    for i, m in enumerate(options, 1):
+        print(f"  {i}. {m}")
+    print(f"  {len(options) + 1}. custom")
+    while True:
+        try:
+            choice = input(f"Model [1-{len(options) + 1}] (default 1): ").strip()
+        except EOFError:
+            choice = ""
+        if choice == "":
+            return options[0]
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(options):
+                return options[idx - 1]
+            if idx == len(options) + 1:
+                custom = input("Custom model name: ").strip()
+                if custom:
+                    return custom
+        print(f"  pick a number 1–{len(options) + 1}")
+
+
 def cmd_setup(args) -> int:
     print(f"Writing config to ~/.config/robbie/config.toml")
     api_key = getpass.getpass("LLM API key: ").strip()
@@ -30,7 +69,7 @@ def cmd_setup(args) -> int:
         print("robbie: no key given, aborting", file=sys.stderr)
         return 1
     base_url = input(f"API base URL [{DEFAULT_BASE_URL}]: ").strip() or DEFAULT_BASE_URL
-    model = input(f"Model [{DEFAULT_MODEL}]: ").strip() or DEFAULT_MODEL
+    model = _pick_model(base_url)
     try:
         path = write_config(api_key, base_url, model)
     except OSError as exc:
