@@ -10,6 +10,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+
 from .coach import RULES_FILE, Coach, CoachError, append_session_log
 from .config import ConfigError, load_config
 from .db import DBError, RobbieDB
@@ -18,6 +23,8 @@ from .parser import parse_session_file
 from .rules import RulesError
 
 SESSIONS_DIR = Path("sessions")
+
+console = Console()
 
 
 def next_session_id() -> str:
@@ -38,14 +45,14 @@ def activate() -> int:
     try:
         config = load_config()
     except ConfigError as exc:
-        print(f"robbie: {exc}", file=sys.stderr)
+        console.print(f"[red]robbie:[/] {exc}")
         return 1
 
     try:
         db = RobbieDB()
     except DBError as exc:
-        print(f"robbie: {exc}", file=sys.stderr)
-        print("is the database up? try: docker compose up -d", file=sys.stderr)
+        console.print(f"[red]robbie:[/] {exc}")
+        console.print("is the database up? try: docker compose up -d")
         return 1
 
     llm = LLMClient(config)
@@ -55,11 +62,18 @@ def activate() -> int:
     history: list[dict] = [{"role": "system", "content": coach.system_prompt()}]
     user_words = 0
 
-    print(f"robbie: session {session_id} — talk to me. /quit to wrap up.\n")
+    console.print(
+        Panel(
+            f"[bold]session {session_id}[/] — talk to me. type [cyan]/quit[/] to wrap up.",
+            border_style="blue",
+        )
+    )
+    console.print()
+
     try:
         while True:
             try:
-                line = input("you> ")
+                line = console.input("[bold cyan]you>[/] ")
             except (EOFError, KeyboardInterrupt):
                 line = "/quit"
 
@@ -72,17 +86,27 @@ def activate() -> int:
             user_words += _count_words(line)
             history.append({"role": "user", "content": line})
 
-            print("\nrobbie> ", end="", flush=True)
-            reply_parts = []
+            reply_parts: list[str] = []
+            live = Live(
+                Markdown("_…_"),
+                console=console,
+                refresh_per_second=15,
+                vertical_overflow="visible",
+            )
+            live.start()
             try:
                 for chunk in llm.chat_stream(history):
-                    print(chunk, end="", flush=True)
                     reply_parts.append(chunk)
+                    live.update(Markdown("".join(reply_parts)))
             except LLMError as exc:
-                print(f"\nrobbie: {exc}", file=sys.stderr)
+                live.stop()
+                console.print(f"\n[red]robbie:[/] {exc}")
                 return 1
-            print("\n")
+            live.stop()
+            if not reply_parts:
+                console.print("[dim]robbie: (no reply)[/]")
             history.append({"role": "assistant", "content": "".join(reply_parts)})
+            console.print()
 
         return _wrap_up(coach, db, history, session_id, user_words)
     finally:
@@ -91,11 +115,11 @@ def activate() -> int:
 
 
 def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, user_words: int) -> int:
-    print("wrapping up…")
+    console.print("[italic]wrapping up…[/]")
     try:
         data = coach.wrap_up(history, session_id, date.today().isoformat())
     except (CoachError, LLMError) as exc:
-        print(f"robbie: {exc}", file=sys.stderr)
+        console.print(f"[red]robbie:[/] {exc}")
         return 1
 
     data["word_count"] = user_words
@@ -119,12 +143,16 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
     )
 
     print(f"\nsaved {session_file}")
-    print(f"rating {session.rating():.1f}/10, {len(session.errors)} errors, "
-          f"{session.word_count} words, "
-          f"{session.errors_per_100_words() or 0:.2f} errors/100 words")
+    console.print(
+        f"[bold]rating[/] {session.rating():.1f}/10, {len(session.errors)} errors, "
+        f"{session.word_count} words, "
+        f"{session.errors_per_100_words() or 0:.2f} errors/100 words"
+    )
     if orphans:
-        print(f"note: new rule_ids without a catalog entry: {', '.join(orphans)}")
-        print("add them to robbie_brain/common_mistakes.md, then run `robbie rules`")
+        console.print(
+            f"[yellow]note:[/] new rule_ids without a catalog entry: {', '.join(orphans)}\n"
+            f"add them to robbie_brain/common_mistakes.md, then run `robbie rules`"
+        )
     return 0
 
 
