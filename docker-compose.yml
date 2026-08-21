@@ -1,0 +1,24 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: robbie-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - robbie-mongo-data:/data/db
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: robbie-mongo-express
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_MONGODB_PORT: "27017"
+
+volumes:
+  robbie-mongo-data:
