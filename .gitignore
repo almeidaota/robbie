@@ -3,3 +3,7 @@
 */session_log.md
 */common_mistakes.md
 sessions/
+
+# Python bytecode
+__pycache__/
+*.pyc
