@@ -32,11 +32,13 @@ def cmd_load(args) -> int:
 
 def cmd_show(args) -> int:
     store = RobbieDB()
-    print(f"{'session':<14} {'date':<12} {'rating':>6}  topics")
-    print("-" * 60)
+    print(f"{'session':<14} {'date':<12} {'words':>5} {'rating':>6} {'err/100w':>9}  topics")
+    print("-" * 72)
     for s in store.all_sessions():
-        print(f"{s.session_id:<14} {s.date:<12} {s.rating():>6.1f}  {', '.join(s.topics)}")
-    print("-" * 60)
+        per_100 = s.errors_per_100_words()
+        per_100_s = f"{per_100:.2f}" if per_100 is not None else "—"
+        print(f"{s.session_id:<14} {s.date:<12} {s.word_count:>5} {s.rating():>6.1f} {per_100_s:>9}  {', '.join(s.topics)}")
+    print("-" * 72)
     print("lifetime counts by rule:", store.counts_by_rule())
     print("lifetime counts by type:", store.counts_by_type())
     store.close()

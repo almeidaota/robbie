@@ -5,6 +5,7 @@
   "date": "2026-08-21",
   "topics": ["schema design", "parser"],
   "notes": "Session where we sketched the schema.",
+  "word_count": 200,
   "errors": [
     {
       "rule_id": 2,

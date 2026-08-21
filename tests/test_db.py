@@ -11,6 +11,7 @@ def make_session(session_id="2026-08-21-01", with_errors=True):
         date="2026-08-21",
         topics=["schema design"],
         notes="test",
+        word_count=150,
         errors=[
             ErrorEntry("2", "transfer", "store the file into a database", "store the file in a database"),
             ErrorEntry("6", "grammar", "a very good day", "a very good day", self_caught=True),
@@ -40,6 +41,7 @@ class TestRobbieDB(unittest.TestCase):
         self.assertIsNotNone(got)
         self.assertEqual(got.rating(), 10.0 - (0.6 + 1.0 * 0.5))
         self.assertEqual(got.counts_by_rule(), {"2": 1, "6": 1})
+        self.assertEqual(got.word_count, 150)
         self.assertEqual(got.vocab_gaps[0].l1_word, "substituir")
 
     def test_upsert_replaces(self):

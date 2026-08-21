@@ -20,6 +20,35 @@ class TestParseSession(unittest.TestCase):
         self.assertEqual(session.topics, ["schema design", "parser"])
         self.assertEqual(len(session.errors), 8)
         self.assertEqual(len(session.vocab_gaps), 1)
+        self.assertEqual(session.word_count, 200)
+
+    def test_bad_word_count(self):
+        with self.assertRaises(SchemaError):
+            parse_session({
+                "schema_version": 1,
+                "session_id": "x",
+                "date": "d",
+                "word_count": -1,
+            })
+        with self.assertRaises(SchemaError):
+            parse_session({
+                "schema_version": 1,
+                "session_id": "x",
+                "date": "d",
+                "word_count": "many",
+            })
+
+    def test_defaults(self):
+        session = parse_session({
+            "schema_version": 1,
+            "session_id": "x",
+            "date": "2026-08-21",
+        })
+        self.assertEqual(session.language, "en")
+        self.assertEqual(session.errors, [])
+        self.assertEqual(session.vocab_gaps, [])
+        self.assertEqual(session.notes, "")
+        self.assertEqual(session.word_count, 0)
 
     def test_error_fields(self):
         session = parse_session_file(FIXTURE)
@@ -118,6 +147,19 @@ class TestRating(unittest.TestCase):
         # 5*0.6 (transfer) + 1*1.0 (grammar) + 0.6*0.5 (transfer, self-caught) + 1*0.3 (typo)
         # = 3.0 + 1.0 + 0.3 + 0.3 = 4.6  ->  10 - 4.6 = 5.4
         self.assertEqual(self.session.rating(), 5.4)
+
+    def test_errors_per_100_words(self):
+        # fixture: 8 errors / 200 words * 100 = 4.0
+        self.assertEqual(self.session.errors_per_100_words(), 4.0)
+
+    def test_errors_per_100_words_unknown(self):
+        session = parse_session({
+            "schema_version": 1,
+            "session_id": "x",
+            "date": "2026-08-21",
+            "errors": [{"rule_id": 2, "type": "typo", "quote": "q", "fix": "f"}],
+        })
+        self.assertIsNone(session.errors_per_100_words())
 
     def test_clean_session_is_10(self):
         session = parse_session({

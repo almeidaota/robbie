@@ -50,6 +50,7 @@ class RobbieDB:
             "language": session.language,
             "topics": list(session.topics),
             "notes": session.notes,
+            "word_count": session.word_count,
             "vocab_gaps": [
                 {
                     "l1_word": gap.l1_word,
@@ -125,6 +126,7 @@ class RobbieDB:
             language=doc.get("language", "en"),
             topics=list(doc.get("topics", [])),
             notes=doc.get("notes", ""),
+            word_count=doc.get("word_count", 0),
             errors=[
                 _error_from_doc(e)
                 for e in sorted(errors_docs, key=lambda e: e["_id"])

@@ -66,6 +66,7 @@ class Session:
     language: str = "en"
     topics: list[str] = field(default_factory=list)
     notes: str = ""
+    word_count: int = 0
     errors: list[ErrorEntry] = field(default_factory=list)
     vocab_gaps: list[VocabGap] = field(default_factory=list)
 
@@ -73,6 +74,12 @@ class Session:
         penalty = sum(e.penalty() for e in self.errors)
         rating = BASE_RATING - penalty
         return round(min(max(rating, MIN_RATING), MAX_RATING), 1)
+
+    def errors_per_100_words(self) -> float | None:
+        """Errors per 100 user-written words. None when word count is unknown."""
+        if self.word_count <= 0:
+            return None
+        return round(len(self.errors) / self.word_count * 100, 2)
 
     def counts_by_rule(self) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -124,6 +131,10 @@ def parse_session(data: dict[str, Any]) -> Session:
     for i, raw in enumerate(data.get("vocab_gaps", [])):
         vocab_gaps.append(_parse_vocab_gap(raw, i))
 
+    word_count = data.get("word_count", 0)
+    if not isinstance(word_count, int) or word_count < 0:
+        raise SchemaError(f"word_count must be a non-negative integer, got {word_count!r}")
+
     return Session(
         session_id=str(_require(data, "session_id")),
         date=str(_require(data, "date")),
@@ -131,6 +142,7 @@ def parse_session(data: dict[str, Any]) -> Session:
         language=str(data.get("language", "en")),
         topics=list(data.get("topics", [])),
         notes=str(data.get("notes", "")),
+        word_count=word_count,
         errors=errors,
         vocab_gaps=vocab_gaps,
     )
