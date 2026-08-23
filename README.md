@@ -17,14 +17,18 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
 
 - **`robbie activate`** — an interactive coaching chat. Streams styled replies,
   counts the words you write, and on wrap-up produces a facts-only session
-  record automatically.
+  record automatically. If MongoDB isn't running, it starts it via
+  `docker compose up -d` for you.
 - **Deterministic rating** — 0–10, recomputed from weights, never stored.
 - **`errors_per_100_words`** — error density, from the word count counted by
   the app (not estimated).
 - **Rules catalog** — `common_mistakes.md` is the single source of truth for
   the rules; synced into MongoDB and referenced by every error.
-- **MongoDB storage** — `sessions` + `errors` + `rules` collections. Facts in,
-  verdicts out (the rating is never persisted).
+- **MongoDB storage** — `sessions` + `errors` + `rules` + `cards` collections.
+  Facts in, verdicts out (the rating is never persisted).
+- **Spaced-repetition vocab cards** — every `(l1_word?)` gap in a session
+  becomes a card (`cards` collection), reviewed with your own SM-2 engine via
+  `robbie review`, and exportable to Anki with `robbie export`.
 - **Language-agnostic core** — a `language` field + per-language surface files
   (profile, rules, session log) is all it takes to coach another L1→target pair.
 - **Open source** — GPL-3.0, personal data gitignored, `*.example.md` templates
@@ -72,6 +76,8 @@ robbie activate     # start a coaching session
 robbie show         # dashboard: sessions, ratings, errors per 100 words
 robbie load         # (re)load session JSON files into MongoDB
 robbie rules        # sync common_mistakes.md into the rules collection
+robbie review       # spaced-repetition review of your vocab-gap cards
+robbie export       # build an Anki .apkg from the vocab cards
 ```
 
 ### `robbie activate`
@@ -89,6 +95,22 @@ robbie rules        # sync common_mistakes.md into the rules collection
   - appends a summary to `robbie_brain/session_log.md`
   - prints the rating and errors/100 words
   - warns about any new `rule_id`s that don't exist in the catalog yet
+
+### `robbie review`
+
+- Shows every vocab-gap card that's due today (front = the Portuguese trigger
+  word, back = the English word + the contexts where you gapped).
+- Self-test, then grade each card **Again / Hard / Good / Easy** — that drives
+  the SM-2 spaced-repetition schedule stored on the card.
+- New cards are due immediately; intervals grow by `interval × ease_factor`.
+
+### `robbie export`
+
+- Builds an Anki package (`robbie_vocab.apkg` by default) from every vocab
+  card, offline via `genanki` — no Anki needed. One note per card: front = the
+  L1 trigger word, back = the English word + every context sentence, in the
+  `Robbie::English` deck. Suspended cards are skipped. One-way: exporting never
+  touches the cards collection.
 
 ## The rating, explained
 
@@ -119,14 +141,17 @@ app as you type, so the density metric is a fact, not a guess.
 
 ```
 robbie/
-  cli.py       # robbie command (activate, setup, show, load, rules)
+  cli.py       # robbie command (activate, setup, show, load, rules, review, export)
   activate.py  # interactive chat loop + wrap-up pipeline
   coach.py     # prompt assembly (profile, rules, recent sessions) + wrap-up
   config.py    # ~/.config/robbie/config.toml + env overrides
   llm.py       # OpenAI-compatible streaming client
   parser.py    # session schema + deterministic rating/counts
+  sm2.py       # SM-2 spaced-repetition engine (pure, deterministic)
+  review.py    # robbie review: grade due vocab cards
+  export.py    # robbie export: build an Anki .apkg (genanki)
   rules.py     # common_mistakes.md → rules collection
-  db.py        # MongoDB: sessions, errors, rules
+  db.py        # MongoDB: sessions, errors, rules, cards
 robbie_brain/  # your personal coach memory (gitignored) + *.example.md
 sessions/      # session JSON records (gitignored)
 tests/         # unittest suite
@@ -140,6 +165,11 @@ MongoDB stores **facts, never verdicts**:
   vocab gaps), keyed by `session_id`.
 - `errors` — one document per error, referencing `session_id` + `rule_id`.
 - `rules` — the catalog synced from `common_mistakes.md`.
+- `cards` — one document per `(l1_word, target_word)` vocab-gap pair:
+  the facts (`contexts`, `first_seen`, `last_seen`, `times_gapped`) plus the
+  mutable SM-2 review state (`repetitions`, `ease_factor`, `interval_days`,
+  `due_date`, `last_reviewed`). Keyed by a stable slug like
+  `substituir->replace`.
 
 `robbie show` is the live dashboard: "how many preposition errors ever?" is a
 group-by query, not a hand-edited counter.

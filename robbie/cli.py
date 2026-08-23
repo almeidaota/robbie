@@ -6,6 +6,8 @@ Usage:
   robbie show         dashboard: sessions, ratings, errors per 100 words
   robbie load         load session files into MongoDB
   robbie rules        sync rules catalog into MongoDB
+  robbie review       spaced-repetition review of your vocab-gap cards
+  robbie export       build an Anki .apkg from the vocab cards
 """
 
 import argparse
@@ -16,7 +18,9 @@ from pathlib import Path
 from .activate import activate
 from .config import DEFAULT_BASE_URL, DEFAULT_MODEL, ConfigError, write_config
 from .db import DBError, RobbieDB
+from .export import build_deck, export
 from .parser import SchemaError, parse_session_file
+from .review import review
 
 
 def cmd_activate(args) -> int:
@@ -90,7 +94,8 @@ def cmd_load(args) -> int:
             print(f"SKIP {p}: {exc}", file=sys.stderr)
             continue
         db.upsert_session(session)
-        print(f"loaded {p} ({session.session_id}, rating {session.rating():.1f})")
+        n_cards = db.sync_cards_from_session(session)
+        print(f"loaded {p} ({session.session_id}, rating {session.rating():.1f}, {n_cards} vocab card(s))")
         loaded += 1
     db.close()
     return 0
@@ -124,6 +129,23 @@ def cmd_rules(args) -> int:
     return 0
 
 
+def cmd_review(args) -> int:
+    return review()
+
+
+def cmd_export(args) -> int:
+    db = RobbieDB()
+    cards = db.all_cards()
+    db.close()
+    if not cards:
+        print("robbie: no vocab cards to export — gaps appear after a session")
+        return 0
+    deck = build_deck(cards)
+    path = export(deck, args.output)
+    print(f"exported {len(deck.notes)} card(s) to {path}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="robbie")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -140,6 +162,18 @@ def main() -> int:
 
     p_show = sub.add_parser("show", help="show stored sessions with recomputed ratings")
     p_show.set_defaults(func=cmd_show)
+
+    p_review = sub.add_parser("review", help="spaced-repetition review of vocab-gap cards")
+    p_review.set_defaults(func=cmd_review)
+
+    p_export = sub.add_parser("export", help="build an Anki .apkg from the vocab cards")
+    p_export.add_argument(
+        "output",
+        nargs="?",
+        default="robbie_vocab.apkg",
+        help="output .apkg path (default: robbie_vocab.apkg)",
+    )
+    p_export.set_defaults(func=cmd_export)
 
     p_rules = sub.add_parser("rules", help="sync rules collection from common_mistakes.md")
     p_rules.add_argument(

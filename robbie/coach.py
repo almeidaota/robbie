@@ -40,7 +40,7 @@ other text, no markdown fences. Follow this schema exactly:
     }}
   ],
   "vocab_gaps": [
-    {{"l1_word": "palavra", "target_word": "word", "context": "sentence where it happened"}}
+    {{"l1_word": "palavra", "target_word": "word", "context": "I need to (palavra?) that line"}}
   ]
 }
 
@@ -51,6 +51,9 @@ Rules:
 - self_caught: true only if I corrected myself mid-conversation.
 - If a new error pattern showed up, give it a new short rule_id like
   "double-aux" and add a title in notes.
+- For every vocab_gap, context MUST be the full sentence I actually typed,
+  with the L1 word in parentheses where I flagged it. Never just "(word)"
+  on its own — the sentence is what makes the gap learnable.
 """
 
 

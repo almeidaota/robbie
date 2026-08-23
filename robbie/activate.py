@@ -6,7 +6,9 @@ against the schema, stores it, and appends a human summary to session_log.md.
 """
 
 import json
+import subprocess
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -41,6 +43,43 @@ def next_session_id() -> str:
     return f"{today}-{max(counts, default=0) + 1:02d}"
 
 
+def _compose_up() -> bool:
+    """Start MongoDB (+ mongo-express) via docker compose. True on success."""
+    console.print("[dim]starting MongoDB via docker compose…[/]")
+    try:
+        proc = subprocess.run(
+            ["docker", "compose", "up", "-d"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        console.print("[red]robbie:[/] docker not found on PATH")
+        return False
+    if proc.returncode != 0:
+        console.print(f"[red]robbie:[/] `docker compose up -d` failed:\n{proc.stdout}{proc.stderr}")
+        return False
+    return True
+
+
+def _connect_db(max_retries: int = 5, delay: float = 1.0) -> RobbieDB | None:
+    """Connect to MongoDB, starting docker compose on demand if needed."""
+    try:
+        return RobbieDB()
+    except DBError as exc:
+        console.print(f"[yellow]robbie:[/] {exc}")
+        if not _compose_up():
+            console.print("is the database up? try: docker compose up -d")
+            return None
+        for attempt in range(1, max_retries + 1):
+            try:
+                return RobbieDB()
+            except DBError:
+                if attempt < max_retries:
+                    time.sleep(delay)
+        console.print("[red]robbie:[/] MongoDB still not reachable after `docker compose up -d`")
+        return None
+
+
 def activate() -> int:
     try:
         config = load_config()
@@ -48,11 +87,8 @@ def activate() -> int:
         console.print(f"[red]robbie:[/] {exc}")
         return 1
 
-    try:
-        db = RobbieDB()
-    except DBError as exc:
-        console.print(f"[red]robbie:[/] {exc}")
-        console.print("is the database up? try: docker compose up -d")
+    db = _connect_db()
+    if db is None:
         return 1
 
     llm = LLMClient(config)
@@ -142,6 +178,7 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
 
     session = parse_session_file(session_file)
     db.upsert_session(session)
+    n_cards = db.sync_cards_from_session(session)
     try:
         summary = db.sync_rules(RULES_FILE)
         orphans = summary["orphan_rule_ids"]
@@ -167,6 +204,8 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
             f"[yellow]note:[/] new rule_ids without a catalog entry: {', '.join(orphans)}\n"
             f"add them to robbie_brain/common_mistakes.md, then run `robbie rules`"
         )
+    if n_cards:
+        console.print(f"[cyan]vocab cards:[/] {n_cards} gapped pair(s) upserted — try `robbie review`")
     return 0
 
 

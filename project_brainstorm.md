@@ -145,10 +145,27 @@ doesn't matter. Building a slightly-too-big project is how you learn it.
 - Review engine: **SM-2** spaced repetition algorithm (the one Anki is built on).
   - ~50-100 lines of Python, fully deterministic, no judgment calls.
   - `interval = previous_interval * ease_factor`, graded by Again/Hard/Good/Easy.
-- Option A: push cards into Anki via its API.
-- Option B (funner): build SM-2 from scratch — mini-Anki for my own gaps.
 - NOT the main project. Just a side idea that bolts on later, since vocab gaps
   will already be in the DB.
+
+### Vocab gap storage design (decided 2026-08-21, not built)
+
+- `sessions.vocab_gaps` **stays as-is** — the fact record of "what gaps happened
+  this session." Never the review state.
+- New **`cards` collection** — one doc per `(l1_word, target_word)` pair, keyed
+  by a stable slug `_id: "atualize->update"`:
+  - facts: `l1_word`, `target_word`, `contexts: [{session_id, date, context}]`,
+    `first_seen`, `last_seen`, `times_gapped`
+  - SM-2 state (mutable, must be persisted — can't be recomputed from facts):
+    `repetitions`, `ease_factor`, `interval_days`, `due_date`, `last_reviewed`
+  - optional `status`: learning / reviewing / mature / suspended
+- Wrap-up upserts cards from the session's gaps: new pair → create card;
+  existing pair → append context, bump `times_gapped`.
+- **Decision: own SM-2 engine is the scheduler** (build it, fun + learning).
+- **Anki-compatible escape hatch:** `robbie export` builds an Anki package via
+  the `genanki` pip lib (works without Anki running). One note per card,
+  front = l1_word, back = target_word + all context sentences, deck
+  `Robbie::English`. One-way, no dedup — that's fine for export.
 
 ## Open-Source Edition
 
@@ -171,6 +188,45 @@ Goal: anyone with an LLM key can run the coach free. Site is the front door
 - Error recognition is the part that stays fuzzy; spacing out the *review* is the
   part that's pure math — the project splits cleanly at that boundary.
 
+## Giving the Coach Internet Access (idea, not built)
+
+Let Robbie browse the web during a session. Three paths, least → most work:
+
+1. **Provider-side browsing (zero code).** `base_url` is already configurable, so
+   point it at an endpoint that browses for us (OpenRouter `:online` / web-search
+   plugin, Perplexity, etc.). Easiest, but no control over when/what it fetches.
+2. **Agentic tool calling (the real fix).** `llm.chat_stream()` has no tool
+   support yet. Add tool schemas (`web_search`, `fetch_url`), a tool-executor
+   loop in the chat flow that runs the tool and feeds results back as `tool`
+   messages, and a system-prompt note in `coach.py` telling Robbie it *can*
+   browse. Browsing becomes a deliberate, visible action mid-conversation.
+3. **Static fetch before the session.** Query a search API at startup and inject
+   snippets into the system prompt. No agent loop, but not live browsing either.
+
+For a coach, option 2 is the only one that feels like Robbie actually browsing.
+
+## Coach Modes (idea, decided 2026-08-22, not built)
+
+Robbie switches modes mid-session with a slash command, like `/quit`:
+
+- **`/casual` (default)** — casual friend, corrections woven into the flow.
+  **Hard rule: correct on EVERY response. Never let an error slide unremarked.**
+- **`/formal`** — push formal register + written English. Corrections focus on
+  written-style errors and vocabulary register (ditch the "AI English" list
+  too, but aim at a higher/formal register).
+- **`/interview`** — structured Q&A: Robbie picks a topic, asks a question, you
+  answer, it reviews your answer before the next one (job-interview style or
+  topic interviews).
+
+Mechanics (open):
+- Slash commands are read in the chat loop (like `/quit`), set a `mode` var
+  that's injected into the system prompt and switched mid-history.
+- Does the mode go into the session record, or is it ephemeral chat behavior?
+- `/interview` needs its own loop shape: pick a topic → question → answer →
+  review → next question. Feedback held until you finish your answer.
+- Mode likely lives in the session facts too (so we can track "formal-mode
+  accuracy vs casual").
+
 ## Open Questions / Next Steps
 
 - [ ] Wait for input from the English teacher (Wednesday).
@@ -181,6 +237,10 @@ Goal: anyone with an LLM key can run the coach free. Site is the front door
 - [ ] Add `language` field to schema for the language-agnostic version (Italian friend).
 - [ ] Sketch the Portuguese-transfer knowledge base content.
 - [ ] Decide license (MIT vs GPL) when the repo gets created.
+- [ ] Give the coach internet access — start with tool calling (option 2 above).
+- [x] Build the SM-2 review engine + `cards` collection for vocab gaps.
+- [x] Add `robbie export` — build an Anki `.apkg` from the `cards` collection (genanki).
+- [ ] Add coach modes (`/casual`, `/formal`, `/interview`) toggleable mid-session.
 
 ## Bootstrapping the Coach Memory
 
