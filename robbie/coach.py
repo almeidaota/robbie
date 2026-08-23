@@ -10,10 +10,11 @@ import re
 from pathlib import Path
 
 from .db import RobbieDB
-from .parser import SchemaError, parse_session
+from .parser import DEFAULT_MODE, MODES, SchemaError, parse_session
 
 BRAIN_DIR = Path("robbie_brain")
 AGENTS_FILE = BRAIN_DIR / "AGENTS.md"
+MODE_AGENTS_DIR = BRAIN_DIR / "agents"
 PROFILE_FILE = BRAIN_DIR / "profile.md"
 RULES_FILE = BRAIN_DIR / "common_mistakes.md"
 SESSION_LOG_FILE = BRAIN_DIR / "session_log.md"
@@ -62,13 +63,27 @@ class CoachError(RuntimeError):
 
 
 class Coach:
-    def __init__(self, llm, db: RobbieDB) -> None:
+    def __init__(self, llm, db: RobbieDB, mode: str = DEFAULT_MODE) -> None:
         self._llm = llm
         self._db = db
+        self.set_mode(mode)
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def set_mode(self, mode: str) -> None:
+        if mode not in MODES:
+            raise ValueError(f"unknown mode {mode!r}, expected one of {MODES}")
+        self._mode = mode
 
     def system_prompt(self) -> str:
-        """Assemble the system prompt deterministically."""
+        """Assemble the system prompt deterministically, with the active mode."""
         parts = [_read_or("", AGENTS_FILE)]
+
+        mode_prompt = _read_or("", MODE_AGENTS_DIR / f"{self._mode}.md")
+        if mode_prompt:
+            parts.append(f"## Active mode: {self._mode}\n" + mode_prompt)
 
         profile = _read_or("", PROFILE_FILE)
         if profile:

@@ -14,6 +14,9 @@ SCHEMA_VERSION = 1
 
 SUPPORTED_TYPES = ("grammar", "transfer", "typo", "style")
 
+MODES = ("casual", "formal", "interview")
+DEFAULT_MODE = "casual"
+
 # Weights per error type. Deterministic, single source of truth.
 # Adjust these and re-run on old files: every past session re-scores consistently.
 WEIGHTS = {
@@ -64,6 +67,7 @@ class Session:
     date: str
     schema_version: int = SCHEMA_VERSION
     language: str = "en"
+    mode: str = DEFAULT_MODE
     topics: list[str] = field(default_factory=list)
     notes: str = ""
     word_count: int = 0
@@ -140,12 +144,20 @@ def parse_session(data: dict[str, Any]) -> Session:
         date=str(_require(data, "date")),
         schema_version=version,
         language=str(data.get("language", "en")),
+        mode=_parse_mode(data),
         topics=list(data.get("topics", [])),
         notes=str(data.get("notes", "")),
         word_count=word_count,
         errors=errors,
         vocab_gaps=vocab_gaps,
     )
+
+
+def _parse_mode(data: dict[str, Any]) -> str:
+    mode = data.get("mode", DEFAULT_MODE)
+    if not isinstance(mode, str) or mode not in MODES:
+        raise SchemaError(f"mode must be one of {MODES}, got {mode!r}")
+    return mode
 
 
 def _parse_error(raw: Any, index: int) -> ErrorEntry:

@@ -21,7 +21,7 @@ from .coach import RULES_FILE, Coach, CoachError, append_session_log
 from .config import ConfigError, load_config
 from .db import DBError, RobbieDB
 from .llm import LLMClient, LLMError
-from .parser import parse_session_file
+from .parser import DEFAULT_MODE, parse_session_file
 from .rules import RulesError
 
 SESSIONS_DIR = Path("sessions")
@@ -80,7 +80,7 @@ def _connect_db(max_retries: int = 5, delay: float = 1.0) -> RobbieDB | None:
         return None
 
 
-def activate() -> int:
+def activate(mode: str = DEFAULT_MODE) -> int:
     try:
         config = load_config()
     except ConfigError as exc:
@@ -92,7 +92,7 @@ def activate() -> int:
         return 1
 
     llm = LLMClient(config)
-    coach = Coach(llm, db)
+    coach = Coach(llm, db, mode=mode)
     session_id = next_session_id()
 
     history: list[dict] = [{"role": "system", "content": coach.system_prompt()}]
@@ -100,7 +100,8 @@ def activate() -> int:
 
     console.print(
         Panel(
-            f"[bold]session {session_id}[/] — talk to me. type [cyan]/quit[/] to wrap up.",
+            f"[bold]session {session_id}[/] — mode [cyan]{coach.mode}[/]. "
+            f"talk to me. type [cyan]/quit[/] to wrap up.",
             border_style="blue",
         )
     )
@@ -173,6 +174,7 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
         return 1
 
     data["word_count"] = user_words
+    data["mode"] = coach.mode
     session_file = SESSIONS_DIR / f"{session_id}.json"
     session_file.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

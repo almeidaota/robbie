@@ -19,7 +19,7 @@ from pathlib import Path
 from pymongo import ASCENDING, MongoClient, errors
 
 from . import sm2
-from .parser import Session
+from .parser import DEFAULT_MODE, Session
 
 DEFAULT_URI = "mongodb://localhost:27017"
 DEFAULT_DB = "robbie"
@@ -55,6 +55,7 @@ class RobbieDB:
             "schema_version": session.schema_version,
             "date": session.date,
             "language": session.language,
+            "mode": session.mode,
             "topics": list(session.topics),
             "notes": session.notes,
             "word_count": session.word_count,
@@ -241,6 +242,7 @@ class RobbieDB:
             date=doc["date"],
             schema_version=doc.get("schema_version", 1),
             language=doc.get("language", "en"),
+            mode=doc.get("mode", DEFAULT_MODE),
             topics=list(doc.get("topics", [])),
             notes=doc.get("notes", ""),
             word_count=doc.get("word_count", 0),

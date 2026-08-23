@@ -205,27 +205,27 @@ Let Robbie browse the web during a session. Three paths, least → most work:
 
 For a coach, option 2 is the only one that feels like Robbie actually browsing.
 
-## Coach Modes (idea, decided 2026-08-22, not built)
+## Coach Modes (built 2026-08-22, one mode per session)
 
-Robbie switches modes mid-session with a slash command, like `/quit`:
+Robbie runs in one mode per session, chosen at start:
 
-- **`/casual` (default)** — casual friend, corrections woven into the flow.
+- **`casual` (default)** — casual friend, corrections woven into the flow.
   **Hard rule: correct on EVERY response. Never let an error slide unremarked.**
-- **`/formal`** — push formal register + written English. Corrections focus on
-  written-style errors and vocabulary register (ditch the "AI English" list
-  too, but aim at a higher/formal register).
-- **`/interview`** — structured Q&A: Robbie picks a topic, asks a question, you
-  answer, it reviews your answer before the next one (job-interview style or
-  topic interviews).
+- **`formal`** — workplace register (not butler-speak): written English,
+  register slips, and phrasing that reads rude on formal occasions (bare
+  imperatives, blunt negatives, "ain't"/"gonna" & co).
+- **`interview`** — structured Q&A: Robbie picks a topic, asks a question, you
+  answer, it reviews your answer before the next one.
 
-Mechanics (open):
-- Slash commands are read in the chat loop (like `/quit`), set a `mode` var
-  that's injected into the system prompt and switched mid-history.
-- Does the mode go into the session record, or is it ephemeral chat behavior?
-- `/interview` needs its own loop shape: pick a topic → question → answer →
-  review → next question. Feedback held until you finish your answer.
-- Mode likely lives in the session facts too (so we can track "formal-mode
-  accuracy vs casual").
+Mechanics:
+- Each mode has its own agent file in `robbie_brain/agents/{mode}.md`, injected
+  into the system prompt under an "Active mode" header. `AGENTS.md` is the
+  mode-neutral base (correction protocol + wrap-up).
+- Mode is set at session start: `robbie activate --mode casual|formal|interview`.
+  No mid-session toggling — a session has exactly one mode.
+- The app stores the mode on the session record (deterministically, not by the
+  LLM) → `sessions.mode` in MongoDB, shown in `robbie show`. That unlocks
+  per-mode analysis ("formal-mode accuracy vs casual") later.
 
 ## Open Questions / Next Steps
 
@@ -240,7 +240,8 @@ Mechanics (open):
 - [ ] Give the coach internet access — start with tool calling (option 2 above).
 - [x] Build the SM-2 review engine + `cards` collection for vocab gaps.
 - [x] Add `robbie export` — build an Anki `.apkg` from the `cards` collection (genanki).
-- [ ] Add coach modes (`/casual`, `/formal`, `/interview`) toggleable mid-session.
+- [x] Add coach modes (`/casual`, `/formal`, `/interview`) toggleable mid-session.
+- [x] One mode per session, stored on the record (`sessions.mode`), shown in `robbie show` — enables per-mode ratings.
 
 ## Bootstrapping the Coach Memory
 

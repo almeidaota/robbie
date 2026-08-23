@@ -47,6 +47,43 @@ GOOD_JSON = (
 BAD_JSON = '{"schema_version": 1, "session_id": "2026-08-21-99", "date": "2026-08-21", "errors": [{"rule_id": "2", "type": "wrong-type", "quote": "q", "fix": "f"}]}'
 
 
+class TestModeSwitching(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from robbie.db import RobbieDB
+
+        cls.db = RobbieDB(db_name="robbie_test")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.db.close()
+
+    def test_mode_defaults_to_casual(self):
+        from robbie.coach import Coach
+
+        coach = Coach(FakeLLM([]), self.db)
+        self.assertEqual(coach.mode, "casual")
+
+    def test_set_mode_and_unknown_mode_raises(self):
+        from robbie.coach import Coach
+
+        coach = Coach(FakeLLM([]), self.db, mode="formal")
+        self.assertEqual(coach.mode, "formal")
+        coach.set_mode("interview")
+        self.assertEqual(coach.mode, "interview")
+        with self.assertRaises(ValueError):
+            coach.set_mode("nope")
+
+    def test_system_prompt_includes_active_mode(self):
+        from robbie.coach import Coach
+
+        coach = Coach(FakeLLM([]), self.db)
+        coach.set_mode("formal")
+        prompt = coach.system_prompt()
+        self.assertIn("## Active mode: formal", prompt)
+        self.assertIn("Mode: formal", prompt)
+
+
 class TestWrapUp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

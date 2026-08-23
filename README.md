@@ -19,6 +19,10 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
   counts the words you write, and on wrap-up produces a facts-only session
   record automatically. If MongoDB isn't running, it starts it via
   `docker compose up -d` for you.
+- **Coach modes** — one mode per session, set at start with
+  `robbie activate --mode formal`. `casual` always corrects; `formal` pushes a
+  written/register-slip-aware workplace register; `interview` runs structured
+  Q&A. The mode is saved with the session so ratings can be compared per mode.
 - **Deterministic rating** — 0–10, recomputed from weights, never stored.
 - **`errors_per_100_words`** — error density, from the word count counted by
   the app (not estimated).
@@ -72,8 +76,9 @@ These are gitignored — the repo ships code, not your data.
 ## Usage
 
 ```sh
-robbie activate     # start a coaching session
-robbie show         # dashboard: sessions, ratings, errors per 100 words
+robbie activate                 # start a coaching session (casual mode)
+robbie activate --mode formal   # one mode for the whole session
+robbie show                     # dashboard: sessions, mode, ratings, errors per 100 words
 robbie load         # (re)load session JSON files into MongoDB
 robbie rules        # sync common_mistakes.md into the rules collection
 robbie review       # spaced-repetition review of your vocab-gap cards
@@ -86,6 +91,10 @@ robbie export       # build an Anki .apkg from the vocab cards
   errors from your rules catalog.
 - A Portuguese word in parentheses with a `?` — e.g. `(atualize?)` — is treated
   as a vocab gap: the coach teaches the English word and moves on.
+- **Modes** — one per session, chosen at start: `robbie activate --mode casual`
+  (default, always corrects), `--mode formal` (workplace register + register
+  slips), `--mode interview` (structured Q&A). The mode is stored on the
+  session and shown in `robbie show`.
 - **End the session** with `/quit`, or just say it ("let's wrap up", "I'm
   done") — the coach signals the wrap-up itself.
 - On wrap-up, the coach emits the session record as JSON per the schema,
@@ -153,6 +162,7 @@ robbie/
   rules.py     # common_mistakes.md → rules collection
   db.py        # MongoDB: sessions, errors, rules, cards
 robbie_brain/  # your personal coach memory (gitignored) + *.example.md
+               # agents/ holds the per-mode coach behavior (casual/formal/interview)
 sessions/      # session JSON records (gitignored)
 tests/         # unittest suite
 ```

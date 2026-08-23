@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "language": "en",
+  "mode": "casual",
   "session_id": "2026-08-21-01",
   "date": "2026-08-21",
   "topics": ["schema design", "parser"],

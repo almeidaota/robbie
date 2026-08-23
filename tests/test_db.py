@@ -5,10 +5,11 @@ from robbie.parser import ErrorEntry, Session, VocabGap
 from robbie.db import DBError, RobbieDB
 
 
-def make_session(session_id="2026-08-21-01", with_errors=True):
+def make_session(session_id="2026-08-21-01", with_errors=True, mode="casual"):
     return Session(
         session_id=session_id,
         date="2026-08-21",
+        mode=mode,
         topics=["schema design"],
         notes="test",
         word_count=150,
@@ -44,6 +45,13 @@ class TestRobbieDB(unittest.TestCase):
         self.assertEqual(got.counts_by_rule(), {"2": 1, "6": 1})
         self.assertEqual(got.word_count, 150)
         self.assertEqual(got.vocab_gaps[0].l1_word, "substituir")
+
+    def test_mode_round_trip(self):
+        self.store.upsert_session(make_session(mode="formal"))
+        got = self.store.get_session("2026-08-21-01")
+        self.assertEqual(got.mode, "formal")
+        doc = self.store.sessions.find_one({"_id": "2026-08-21-01"})
+        self.assertEqual(doc["mode"], "formal")
 
     def test_upsert_replaces(self):
         self.store.upsert_session(make_session(with_errors=True))

@@ -19,12 +19,12 @@ from .activate import activate
 from .config import DEFAULT_BASE_URL, DEFAULT_MODEL, ConfigError, write_config
 from .db import DBError, RobbieDB
 from .export import build_deck, export
-from .parser import SchemaError, parse_session_file
+from .parser import MODES, SchemaError, parse_session_file
 from .review import review
 
 
 def cmd_activate(args) -> int:
-    return activate()
+    return activate(mode=args.mode)
 
 
 MODELS_BY_PROVIDER = {
@@ -103,13 +103,13 @@ def cmd_load(args) -> int:
 
 def cmd_show(args) -> int:
     db = RobbieDB()
-    print(f"{'session':<14} {'date':<12} {'words':>5} {'rating':>6} {'err/100w':>9}  topics")
-    print("-" * 72)
+    print(f"{'session':<14} {'date':<12} {'mode':<10} {'words':>5} {'rating':>6} {'err/100w':>9}  topics")
+    print("-" * 80)
     for s in db.all_sessions():
         per_100 = s.errors_per_100_words()
         per_100_s = f"{per_100:.2f}" if per_100 is not None else "—"
-        print(f"{s.session_id:<14} {s.date:<12} {s.word_count:>5} {s.rating():>6.1f} {per_100_s:>9}  {', '.join(s.topics)}")
-    print("-" * 72)
+        print(f"{s.session_id:<14} {s.date:<12} {s.mode:<10} {s.word_count:>5} {s.rating():>6.1f} {per_100_s:>9}  {', '.join(s.topics)}")
+    print("-" * 80)
     print("lifetime counts by rule:", db.counts_by_rule())
     print("lifetime counts by type:", db.counts_by_type())
     db.close()
@@ -151,6 +151,12 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_activate = sub.add_parser("activate", help="start an interactive coach session")
+    p_activate.add_argument(
+        "--mode",
+        choices=MODES,
+        default="casual",
+        help="coach mode for the whole session (default: casual)",
+    )
     p_activate.set_defaults(func=cmd_activate)
 
     p_setup = sub.add_parser("setup", help="write your LLM config")

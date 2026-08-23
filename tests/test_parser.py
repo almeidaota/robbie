@@ -45,10 +45,29 @@ class TestParseSession(unittest.TestCase):
             "date": "2026-08-21",
         })
         self.assertEqual(session.language, "en")
+        self.assertEqual(session.mode, "casual")
         self.assertEqual(session.errors, [])
         self.assertEqual(session.vocab_gaps, [])
         self.assertEqual(session.notes, "")
         self.assertEqual(session.word_count, 0)
+
+    def test_mode_field(self):
+        session = parse_session({
+            "schema_version": 1,
+            "session_id": "x",
+            "date": "2026-08-21",
+            "mode": "formal",
+        })
+        self.assertEqual(session.mode, "formal")
+
+    def test_unknown_mode(self):
+        with self.assertRaises(SchemaError):
+            parse_session({
+                "schema_version": 1,
+                "session_id": "x",
+                "date": "d",
+                "mode": "shouting",
+            })
 
     def test_error_fields(self):
         session = parse_session_file(FIXTURE)
