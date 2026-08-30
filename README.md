@@ -28,6 +28,12 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
   the app (not estimated).
 - **PostgreSQL storage** — `sessions` + `errors` + `cards` tables.
   Facts in, verdicts out (the rating is never persisted).
+- **Simpler alternative: SQLite** — don't want Docker? The [`simplified`]
+  (https://github.com/almeidaota/robbie/tree/simplified) branch drops
+  PostgreSQL entirely and stores everything in a single local `robbie.db`
+  file via the stdlib `sqlite3` — zero setup, no Docker, no psycopg.
+  Same features, same CLI. Check it out with
+  `git checkout simplified`.
 - **Spaced-repetition vocab cards** — every `(l1_word?)` gap in a session
   becomes a card (`cards` table), reviewed with your own SM-2 engine via
   `robbie review`, and exportable to Anki with `robbie export`.
@@ -41,6 +47,10 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
 - Python 3.11+
 - Docker (for PostgreSQL via `docker compose` — see `docker-compose.yml`)
 - An LLM API key (OpenAI-compatible: DeepSeek, OpenAI, OpenRouter, …)
+
+> No Docker / want a zero-setup local install? Use the [`simplified`]
+> (https://github.com/almeidaota/robbie/tree/simplified) branch — it replaces
+> PostgreSQL with a single SQLite file and needs only Python + an API key.
 
 ## Como rodar
 
