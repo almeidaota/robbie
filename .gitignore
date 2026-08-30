@@ -1,6 +1,5 @@
 # Personal data — never in the repo (brainstorm: "code open, data private")
 */profile.md
-*/session_log.md
 sessions/
 
 # Secrets — keys and credentials live in .env, never here

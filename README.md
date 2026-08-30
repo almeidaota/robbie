@@ -84,7 +84,6 @@ Then create your personal files from the templates:
 
 ```sh
 cp robbie_brain/profile.example.md          robbie_brain/profile.md
-cp robbie_brain/session_log.example.md      robbie_brain/session_log.md
 ```
 
 These are gitignored — the repo ships code, not your data.
@@ -114,7 +113,6 @@ robbie export       # build an Anki .apkg from the vocab cards
 - On wrap-up, the coach emits the session record as JSON per the schema,
   validated by the parser (with up to 3 retries on schema errors). The app:
   - counts your words and stores the session + errors in SQLite
-  - appends a summary to `robbie_brain/session_log.md`
   - prints the rating and errors/100 words
 
 ### `robbie review`

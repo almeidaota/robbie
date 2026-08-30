@@ -2,7 +2,7 @@
 
 Chat loop: reads user input, streams coach replies, counts the user's words
 as they type. On /quit, asks the coach for the session JSON, validates it
-against the schema, stores it, and appends a human summary to session_log.md.
+against the schema, and stores it.
 """
 
 import sys
@@ -13,7 +13,7 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .coach import Coach, CoachError, append_session_log
+from .coach import Coach, CoachError
 from .config import ConfigError, load_config
 from .db import DBError, RobbieDB
 from .llm import LLMClient, LLMError
@@ -146,14 +146,6 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
 
     db.upsert_session(session)
     n_cards = db.sync_cards_from_session(session)
-
-    append_session_log(
-        f"## {session.date} — session {session_id}\n"
-        f"**Topics:** {', '.join(session.topics) if session.topics else '(none)'}\n"
-        f"**Words:** {session.word_count}\n"
-        f"**Errors:** {len(session.errors)}\n"
-        f"**Rating:** {session.rating():.1f}/10"
-    )
 
     console.print(
         f"[bold]rating[/] {session.rating():.1f}/10, {len(session.errors)} errors, "

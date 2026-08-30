@@ -33,7 +33,6 @@ BRAIN_DIR   = ROOT_DIR / "robbie_brain"
 AGENTS_FILE       → AGENTS.md
 MODE_AGENTS_DIR   → agents/<mode>.md     (casual / formal / interview)
 PROFILE_FILE      → profile.md
-SESSION_LOG_FILE  → session_log.md
 WRAP_UP_PROMPT_FILE → wrap_up_prompt.md
 ```
 
@@ -113,7 +112,6 @@ data["word_count"] = user_words ; data["mode"] = coach.mode
 parse_session(data) → Session                   parser.py:121 (no file round-trip)
 db.upsert_session(session)                      db.py:51     replace session + its errors
 db.sync_cards_from_session(session)             db.py:128    vocab gaps → cards
-append_session_log(...)                         coach.py:137 human summary → session_log.md
 print rating, errors/100 words, session facts, new card count
 ```
 
