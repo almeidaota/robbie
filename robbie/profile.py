@@ -74,3 +74,29 @@ def _write_profile(path: Path, values: dict[str, str]) -> None:
     lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def apply_updates(path: Path, updates: list) -> list[str]:
+    """Apply coach-suggested updates to an existing profile.md.
+
+    Only touches bullets whose label matches one of the editable QUESTIONS
+    fields. Fixed fields (native/target language) are never rewritten.
+    Returns the labels that actually changed.
+    """
+    if not path.exists():
+        return []
+    editable = {label for label, _ in QUESTIONS}
+    lines = path.read_text(encoding="utf-8").splitlines()
+    applied: list[str] = []
+    for label, value in updates:
+        if label not in editable:
+            continue
+        marker = f"- **{label}:** "
+        for i, line in enumerate(lines):
+            if line.startswith(marker) and line != marker + value:
+                lines[i] = marker + value
+                applied.append(label)
+                break
+    if applied:
+        path.write_text("\n".join(lines), encoding="utf-8")
+    return applied

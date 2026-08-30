@@ -15,12 +15,12 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .coach import Coach, CoachError, append_session_log
-from .config import ConfigError, load_config
+from .coach import BRAIN_DIR, Coach, CoachError, append_session_log
+from .config import ConfigError, ENV_FILE, ROOT_DIR, load_config
 from .db import DBError, RobbieDB
 from .llm import LLMClient, LLMError
 from .parser import DEFAULT_MODE, parse_session
-from .profile import ensure_profile
+from .profile import PROFILE_FILE, apply_updates, ensure_profile
 
 console = Console()
 
@@ -41,9 +41,21 @@ def next_session_id(db: RobbieDB) -> str:
 def _compose_up() -> bool:
     """Start PostgreSQL (+ Adminer) via docker compose. True on success."""
     console.print("[dim]starting PostgreSQL via docker compose…[/]")
+    compose_file = ROOT_DIR / "docker-compose.yml"
     try:
         proc = subprocess.run(
-            ["docker", "compose", "up", "-d"],
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(compose_file),
+                "--project-directory",
+                str(ROOT_DIR),
+                "--env-file",
+                str(ENV_FILE),
+                "up",
+                "-d",
+            ],
             capture_output=True,
             text=True,
         )
@@ -191,9 +203,30 @@ def _wrap_up(coach: Coach, db: RobbieDB, history: list[dict], session_id: str, u
         f"{session.errors_per_100_words() or 0:.2f} errors/100 words"
     )
     _show_session_facts(session)
+    if session.profile_updates:
+        _offer_profile_updates(session.profile_updates)
     if n_cards:
         console.print(f"[cyan]vocab cards:[/] {n_cards} gapped pair(s) upserted — try `robbie review`")
     return 0
+
+
+def _offer_profile_updates(updates) -> None:
+    """Show the coach's suggested profile changes and ask before applying."""
+    console.print("\n[bold]coach noticed something new about you:[/]")
+    for update in updates:
+        console.print(f"  [cyan]{update.field}:[/] {update.value}")
+    try:
+        answer = console.input("  update profile? [y/N]: ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer not in ("y", "yes"):
+        console.print("[dim]profile left unchanged[/]")
+        return
+    applied = apply_updates(PROFILE_FILE, [(u.field, u.value) for u in updates])
+    if applied:
+        console.print(f"[green]profile updated:[/] {', '.join(applied)}")
+    else:
+        console.print("[dim]profile unchanged (nothing new)[/]")
 
 
 def _show_session_facts(session) -> None:

@@ -61,6 +61,12 @@ class VocabGap:
 
 
 @dataclass
+class ProfileUpdate:
+    field: str
+    value: str
+
+
+@dataclass
 class Session:
     session_id: str
     date: str
@@ -72,6 +78,7 @@ class Session:
     word_count: int = 0
     errors: list[ErrorEntry] = field(default_factory=list)
     vocab_gaps: list[VocabGap] = field(default_factory=list)
+    profile_updates: list[ProfileUpdate] = field(default_factory=list)
 
     def rating(self) -> float:
         penalty = sum(e.penalty() for e in self.errors)
@@ -128,6 +135,10 @@ def parse_session(data: dict[str, Any]) -> Session:
     for i, raw in enumerate(data.get("vocab_gaps", [])):
         vocab_gaps.append(_parse_vocab_gap(raw, i))
 
+    profile_updates = []
+    for i, raw in enumerate(data.get("profile_updates", [])):
+        profile_updates.append(_parse_profile_update(raw, i))
+
     word_count = data.get("word_count", 0)
     if not isinstance(word_count, int) or word_count < 0:
         raise SchemaError(f"word_count must be a non-negative integer, got {word_count!r}")
@@ -143,6 +154,7 @@ def parse_session(data: dict[str, Any]) -> Session:
         word_count=word_count,
         errors=errors,
         vocab_gaps=vocab_gaps,
+        profile_updates=profile_updates,
     )
 
 
@@ -182,4 +194,13 @@ def _parse_vocab_gap(raw: Any, index: int) -> VocabGap:
         target_word=str(_require(raw, "target_word")),
         context=str(_require(raw, "context")),
         date=str(raw.get("date", "")),
+    )
+
+
+def _parse_profile_update(raw: Any, index: int) -> ProfileUpdate:
+    if not isinstance(raw, dict):
+        raise SchemaError(f"profile_updates[{index}] must be an object")
+    return ProfileUpdate(
+        field=str(_require(raw, "field")),
+        value=str(_require(raw, "value")),
     )

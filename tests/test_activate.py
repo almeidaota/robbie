@@ -5,12 +5,13 @@ from robbie.activate import (
     _connect_db,
     _count_words,
     _has_wrap_marker,
+    _offer_profile_updates,
     _show_session_facts,
     _strip_wrap_marker,
     next_session_id,
 )
 from robbie.db import DBError
-from robbie.parser import ErrorEntry, Session, VocabGap
+from robbie.parser import ErrorEntry, ProfileUpdate, Session, VocabGap
 
 
 class TestActivateHelpers(unittest.TestCase):
@@ -71,6 +72,47 @@ class TestShowSessionFacts(unittest.TestCase):
         with patch("robbie.activate.console") as console:
             _show_session_facts(session)
         console.print.assert_not_called()
+
+
+class TestOfferProfileUpdates(unittest.TestCase):
+    def test_applies_on_yes(self):
+        import tempfile
+        from unittest.mock import patch
+        from pathlib import Path
+
+        from robbie.profile import _write_profile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "profile.md"
+            _write_profile(path, {"Level": "intermediate"})
+            updates = [ProfileUpdate(field="Level", value="advanced")]
+            with (
+                patch("robbie.activate.console") as console,
+                patch("robbie.activate.PROFILE_FILE", path),
+                patch("robbie.activate.console.input", return_value="y"),
+            ):
+                _offer_profile_updates(updates)
+            self.assertIn("- **Level:** advanced", path.read_text(encoding="utf-8"))
+            console.print.assert_called()
+
+    def test_leaves_unchanged_on_no(self):
+        import tempfile
+        from unittest.mock import patch
+        from pathlib import Path
+
+        from robbie.profile import _write_profile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "profile.md"
+            _write_profile(path, {"Level": "intermediate"})
+            updates = [ProfileUpdate(field="Level", value="advanced")]
+            with (
+                patch("robbie.activate.console") as console,
+                patch("robbie.activate.PROFILE_FILE", path),
+                patch("robbie.activate.console.input", return_value="n"),
+            ):
+                _offer_profile_updates(updates)
+            self.assertIn("- **Level:** intermediate", path.read_text(encoding="utf-8"))
 
 
 class TestConnectDb(unittest.TestCase):

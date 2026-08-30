@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from robbie.profile import QUESTIONS, _write_profile, ensure_profile
+from robbie.profile import QUESTIONS, _write_profile, apply_updates, ensure_profile
 
 
 class TestEnsureProfile(unittest.TestCase):
@@ -57,6 +57,61 @@ class TestWriteProfile(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             for label, _ in QUESTIONS:
                 self.assertIn(f"- **{label}:** v-{label}", text)
+
+
+class TestApplyUpdates(unittest.TestCase):
+    def _profile(self, tmp, extra: dict | None = None) -> Path:
+        path = Path(tmp) / "profile.md"
+        values = {label: "old" for label, _ in QUESTIONS}
+        if extra:
+            values.update(extra)
+        _write_profile(path, values)
+        return path
+
+    def test_applies_matching_editable_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._profile(tmp)
+            applied = apply_updates(
+                path,
+                [
+                    ("Interests & life context", "started BJJ"),
+                    ("Level", "advanced"),
+                ],
+            )
+            self.assertEqual(
+                set(applied), {"Interests & life context", "Level"}
+            )
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("- **Interests & life context:** started BJJ", text)
+            self.assertIn("- **Level:** advanced", text)
+
+    def test_ignores_fixed_fields_and_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._profile(tmp)
+            applied = apply_updates(
+                path,
+                [
+                    ("Native language", "English"),
+                    ("Target language", "Portuguese"),
+                    ("Nope", "whatever"),
+                ],
+            )
+            self.assertEqual(applied, [])
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("- **Native language:** Portuguese", text)
+            self.assertIn("- **Target language:** English", text)
+
+    def test_skips_unchanged_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._profile(tmp)
+            applied = apply_updates(path, [("Level", "old")])
+            self.assertEqual(applied, [])
+            self.assertIn("- **Level:** old", path.read_text(encoding="utf-8"))
+
+    def test_no_file_returns_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "profile.md"
+            self.assertEqual(apply_updates(path, [("Level", "x")]), [])
 
 
 if __name__ == "__main__":

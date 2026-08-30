@@ -93,7 +93,39 @@ class TestParseSession(unittest.TestCase):
         self.assertEqual(session.language, "en")
         self.assertEqual(session.errors, [])
         self.assertEqual(session.vocab_gaps, [])
+        self.assertEqual(session.profile_updates, [])
         self.assertEqual(session.notes, "")
+
+    def test_profile_updates_parsed(self):
+        session = parse_session({
+            "schema_version": 1,
+            "session_id": "x",
+            "date": "2026-08-21",
+            "profile_updates": [
+                {"field": "Interests & life context", "value": "started BJJ"},
+            ],
+        })
+        self.assertEqual(len(session.profile_updates), 1)
+        self.assertEqual(session.profile_updates[0].field, "Interests & life context")
+        self.assertEqual(session.profile_updates[0].value, "started BJJ")
+
+    def test_profile_update_missing_field(self):
+        with self.assertRaises(SchemaError):
+            parse_session({
+                "schema_version": 1,
+                "session_id": "x",
+                "date": "2026-08-21",
+                "profile_updates": [{"value": "x"}],
+            })
+
+    def test_profile_update_not_object(self):
+        with self.assertRaises(SchemaError):
+            parse_session({
+                "schema_version": 1,
+                "session_id": "x",
+                "date": "2026-08-21",
+                "profile_updates": ["not an object"],
+            })
 
     def test_missing_session_id(self):
         with self.assertRaises(SchemaError):
