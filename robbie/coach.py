@@ -18,7 +18,6 @@ BRAIN_DIR = ROOT_DIR / "robbie_brain"
 AGENTS_FILE = BRAIN_DIR / "AGENTS.md"
 MODE_AGENTS_DIR = BRAIN_DIR / "agents"
 PROFILE_FILE = BRAIN_DIR / "profile.md"
-SESSION_LOG_FILE = BRAIN_DIR / "session_log.md"
 WRAP_UP_PROMPT_FILE = BRAIN_DIR / "wrap_up_prompt.md"
 
 MAX_RETRIES = 3
@@ -112,13 +111,6 @@ class Coach:
             f"coach could not produce a valid session JSON after {MAX_RETRIES} "
             f"attempts. Last error: {last_error}"
         )
-
-
-def append_session_log(entry: str) -> None:
-    """Append a wrap-up entry to robbie_brain/session_log.md."""
-    SESSION_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with SESSION_LOG_FILE.open("a", encoding="utf-8") as f:
-        f.write("\n" + entry.rstrip() + "\n")
 
 
 def _read_or(default: str, path: Path) -> str:
