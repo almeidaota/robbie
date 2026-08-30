@@ -40,7 +40,6 @@ class SchemaError(ValueError):
 
 @dataclass
 class ErrorEntry:
-    rule_id: str
     type: str
     quote: str
     fix: str
@@ -84,12 +83,6 @@ class Session:
         if self.word_count <= 0:
             return None
         return round(len(self.errors) / self.word_count * 100, 2)
-
-    def counts_by_rule(self) -> dict[str, int]:
-        counts: dict[str, int] = {}
-        for e in self.errors:
-            counts[e.rule_id] = counts.get(e.rule_id, 0) + 1
-        return counts
 
     def counts_by_type(self) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -174,7 +167,6 @@ def _parse_error(raw: Any, index: int) -> ErrorEntry:
         raise SchemaError(f"errors[{index}].self_caught must be a boolean")
 
     return ErrorEntry(
-        rule_id=str(_require(raw, "rule_id")),
         type=etype,
         quote=str(_require(raw, "quote")),
         fix=str(_require(raw, "fix")),

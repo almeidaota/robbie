@@ -72,12 +72,10 @@ class TestParseSession(unittest.TestCase):
     def test_error_fields(self):
         session = parse_session_file(FIXTURE)
         first = session.errors[0]
-        self.assertEqual(first.rule_id, "2")
         self.assertEqual(first.type, "transfer")
         self.assertEqual(first.quote, "store the file into a database")
         self.assertEqual(first.fix, "store the file in a database")
         self.assertFalse(first.self_caught)
-        self.assertEqual(len([e for e in session.errors if e.rule_id == "2"]), 5)
 
     def test_vocab_gap_fields(self):
         session = parse_session_file(FIXTURE)
@@ -119,7 +117,7 @@ class TestParseSession(unittest.TestCase):
                 "schema_version": 1,
                 "session_id": "x",
                 "date": "d",
-                "errors": [{"rule_id": 1, "type": "nah", "quote": "q", "fix": "f"}],
+                "errors": [{"type": "nah", "quote": "q", "fix": "f"}],
             })
 
     def test_non_boolean_self_caught(self):
@@ -128,7 +126,7 @@ class TestParseSession(unittest.TestCase):
                 "schema_version": 1,
                 "session_id": "x",
                 "date": "d",
-                "errors": [{"rule_id": 1, "type": "typo", "quote": "q", "fix": "f", "self_caught": "yes"}],
+                "errors": [{"type": "typo", "quote": "q", "fix": "f", "self_caught": "yes"}],
             })
 
     def test_error_missing_fix(self):
@@ -137,7 +135,7 @@ class TestParseSession(unittest.TestCase):
                 "schema_version": 1,
                 "session_id": "x",
                 "date": "d",
-                "errors": [{"rule_id": 1, "type": "typo", "quote": "q"}],
+                "errors": [{"type": "typo", "quote": "q"}],
             })
 
     def test_missing_file(self):
@@ -176,7 +174,7 @@ class TestRating(unittest.TestCase):
             "schema_version": 1,
             "session_id": "x",
             "date": "2026-08-21",
-            "errors": [{"rule_id": 2, "type": "typo", "quote": "q", "fix": "f"}],
+            "errors": [{"type": "typo", "quote": "q", "fix": "f"}],
         })
         self.assertIsNone(session.errors_per_100_words())
 
@@ -193,7 +191,7 @@ class TestRating(unittest.TestCase):
             "schema_version": 1,
             "session_id": "rough",
             "date": "2026-08-21",
-            "errors": [{"rule_id": 2, "type": "grammar", "quote": "q", "fix": "f"}] * 20,
+            "errors": [{"type": "grammar", "quote": "q", "fix": "f"}] * 20,
         })
         self.assertEqual(session.rating(), 0.0)
 
@@ -202,7 +200,7 @@ class TestRating(unittest.TestCase):
             "schema_version": 1,
             "session_id": "x",
             "date": "d",
-            "errors": [{"rule_id": "s1", "type": "style", "quote": "q", "fix": "f"}],
+            "errors": [{"type": "style", "quote": "q", "fix": "f"}],
         })
         self.assertEqual(session.rating(), 10.0)
 
@@ -211,14 +209,14 @@ class TestRating(unittest.TestCase):
             "schema_version": 1,
             "session_id": "x",
             "date": "d",
-            "errors": [{"rule_id": 11, "type": "grammar", "quote": "q", "fix": "f"}],
+            "errors": [{"type": "grammar", "quote": "q", "fix": "f"}],
         })
         self.assertEqual(base.rating(), 9.0)
         self_caught = parse_session({
             "schema_version": 1,
             "session_id": "x",
             "date": "d",
-            "errors": [{"rule_id": 11, "type": "grammar", "quote": "q", "fix": "f", "self_caught": True}],
+            "errors": [{"type": "grammar", "quote": "q", "fix": "f", "self_caught": True}],
         })
         self.assertEqual(self_caught.rating(), 9.5)
 
@@ -226,9 +224,6 @@ class TestRating(unittest.TestCase):
 class TestCounters(unittest.TestCase):
     def setUp(self):
         self.session = parse_session_file(FIXTURE)
-
-    def test_counts_by_rule(self):
-        self.assertEqual(self.session.counts_by_rule(), {"2": 5, "11": 1, "19": 1, "6": 1})
 
     def test_counts_by_type(self):
         self.assertEqual(self.session.counts_by_type(), {"transfer": 6, "grammar": 1, "typo": 1})

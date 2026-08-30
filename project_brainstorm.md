@@ -16,8 +16,8 @@ actually be deterministic.
 
 - At the end of every session, write a **JSON or YAML file** with a preset structure.
 - A **Python script** parses it, calculates the session **rating**, and saves the
-  session log into a **non-relational database** (MongoDB — doubles as a NoSQL
-  learning goal).
+  session log into a **database** (originally MongoDB as a NoSQL learning goal;
+  migrated to PostgreSQL in 2026-08-28).
 - Considered saving the whole raw conversation, but it'd get heavy fast —
   dropped.
 
@@ -62,7 +62,11 @@ actually be deterministic.
 
 - Two collections: `sessions` and `errors`.
 - Error documents reference `session_id`.
-- MongoDB is overkill at this scale, but it's a NoSQL learning project, so fine.
+- ~~MongoDB is overkill at this scale, but it's a NoSQL learning project, so fine.~~
+- **Migrated to PostgreSQL (2026-08-28):** tables `sessions` / `errors` / `cards` via
+  `psycopg3`. Mongo was the original NoSQL learning goal; at this scale Postgres
+  is the better fit (JSONB keeps the embedded-array shape, `SERIAL` keeps error
+  ordering, and credentials now live in the repo-root `.env`).
 
 ## The Real Brain Problem: Context Window
 
@@ -224,7 +228,7 @@ Mechanics:
 - Mode is set at session start: `robbie activate --mode casual|formal|interview`.
   No mid-session toggling — a session has exactly one mode.
 - The app stores the mode on the session record (deterministically, not by the
-  LLM) → `sessions.mode` in MongoDB, shown in `robbie show`. That unlocks
+  LLM)   → `sessions.mode` in PostgreSQL, shown in `robbie show`. That unlocks
   per-mode analysis ("formal-mode accuracy vs casual") later.
 
 ## Open Questions / Next Steps
@@ -242,6 +246,7 @@ Mechanics:
 - [x] Add `robbie export` — build an Anki `.apkg` from the `cards` collection (genanki).
 - [x] Add coach modes (`/casual`, `/formal`, `/interview`) toggleable mid-session.
 - [x] One mode per session, stored on the record (`sessions.mode`), shown in `robbie show` — enables per-mode ratings.
+- [x] Show the session's errors + vocab gaps in the wrap-up output — I want to see them every time we wrap up.
 
 ## Bootstrapping the Coach Memory
 

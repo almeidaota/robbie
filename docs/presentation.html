@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robbie — Coach de Inglês no Terminal</title>
+<style>
+  :root {
+    --bg: #101418;
+    --bg2: #161c22;
+    --panel: #1b232b;
+    --border: #2a3540;
+    --text: #dbe4ec;
+    --muted: #8b9bab;
+    --accent: #4cc38a;
+    --accent2: #5aa7e8;
+    --warn: #e8b45a;
+    --danger: #e0706e;
+    --code: #a9c1d9;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    overflow: hidden;
+  }
+
+  .mono, pre, code, .cmd { font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace; }
+
+  /* ---------- deck ---------- */
+  .deck { height: 100%; position: relative; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    padding: 44px 60px;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; }
+  .slide.title, .slide.thanks { justify-content: center; }
+
+  .slide h1 { font-size: 3rem; letter-spacing: -.5px; color: #fff; margin-bottom: 8px; }
+  .slide h2 {
+    font-size: 1.7rem; color: #fff; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .slide h2 .n {
+    color: var(--accent); font-family: "Cascadia Mono", Consolas, monospace; font-size: 1rem;
+  }
+  .sub { color: var(--muted); font-size: 1rem; margin-bottom: 20px; max-width: 860px; }
+
+  /* ---------- cards ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .card .cmd { color: var(--accent); font-weight: 600; font-size: .95rem; }
+  .card p, .card li { color: var(--muted); font-size: .88rem; }
+  .card ul { padding-left: 18px; }
+
+  /* ---------- terminal mock ---------- */
+  .term {
+    background: #0b1015; border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: .82rem; line-height: 1.6; margin: 8px 0;
+  }
+  .term .tbar {
+    display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+    background: #182029; border-bottom: 1px solid var(--border);
+  }
+  .term .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .term .dot.r { background: #e0706e; }
+  .term .dot.y { background: #e8b45a; }
+  .term .dot.g { background: #4cc38a; }
+  .term .tt { margin-left: 8px; color: var(--muted); font-size: .72rem; }
+  .term .tbody { padding: 12px 16px; overflow-x: auto; white-space: pre; }
+
+  .t-dim { color: var(--muted); }
+  .t-green { color: var(--accent); }
+  .t-cyan { color: var(--accent2); }
+  .t-yellow { color: var(--warn); }
+  .t-red { color: var(--danger); }
+  .t-white { color: #fff; font-weight: 600; }
+
+  .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .row .grow { flex: 1; min-width: 300px; }
+  .bullets { color: var(--muted); font-size: .92rem; list-style: none; }
+  .bullets li { margin-bottom: 8px; padding-left: 20px; position: relative; }
+  .bullets li::before { content: "▸"; color: var(--accent); position: absolute; left: 0; }
+  .bullets code { color: var(--code); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.type-g { color: var(--danger); font-weight: 600; }
+  td.type-t { color: var(--warn); font-weight: 600; }
+  td.type-p { color: var(--accent2); font-weight: 600; }
+  td.type-s { color: var(--muted); font-weight: 600; }
+
+  .example {
+    background: var(--panel); border-left: 3px solid var(--accent);
+    padding: 12px 16px; border-radius: 0 10px 10px 0; margin-top: 14px; font-size: .88rem;
+  }
+  .example .mono { color: var(--code); }
+
+  /* ---------- chrome ---------- */
+  .counter {
+    position: fixed; bottom: 14px; right: 22px;
+    color: var(--muted); font-family: "Cascadia Mono", Consolas, monospace; font-size: .82rem;
+  }
+  .hint {
+    position: fixed; bottom: 14px; left: 22px; color: var(--muted); font-size: .78rem;
+  }
+  .progress {
+    position: fixed; top: 0; left: 0; height: 3px; background: var(--accent);
+    width: 0; transition: width .25s ease; z-index: 10;
+  }
+
+  @media (max-width: 700px) {
+    .slide { padding: 26px 20px; }
+    .slide h1 { font-size: 2rem; }
+    .slide h2 { font-size: 1.3rem; }
+    .term { font-size: .68rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 - Título -->
+  <section class="slide title">
+    <div class="mono" style="color:var(--muted); margin-bottom:20px;">robbie&gt; vamos praticar seu inglês?</div>
+    <h1>Robbie</h1>
+    <p style="font-size:1.3rem; color:var(--accent); margin-bottom:10px;">Um coach de inglês que vive no seu terminal</p>
+    <p class="sub" style="font-size:1rem;">Conversa como um amigo, corrige sua gramática, rastreia seus erros e pontua cada sessão de forma determinística.</p>
+    <div class="term" style="max-width:720px; font-size:.85rem;">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">robbie — terminal</span></div>
+      <div class="tbody"><span class="t-green">$</span> robbie --help
+usage: robbie [-h] {activate,setup,show,review,export} ...
+  activate   start an interactive coach session
+  setup      write your LLM config
+  show       dashboard: sessions, ratings, errors per 100 words
+  review     spaced-repetition review of your vocab-gap cards
+  export     build an Anki .apkg from the vocab cards</div>
+    </div>
+  </section>
+
+  <!-- 2 - Visão geral dos comandos -->
+  <section class="slide">
+    <h2><span class="n">01</span>Os cinco comandos</h2>
+    <p class="sub">Um assistente de terminal, não um site: tudo roda na sua máquina, os dados ficam com você.</p>
+    <div class="grid">
+      <div class="card">
+        <span class="cmd">robbie setup</span>
+        <p>Guarda sua chave da API de LLM em <code>~/.config/robbie/</code>, com lista de modelos.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">robbie activate</span>
+        <p>O chat de coaching. Corrige, conta suas palavras e encerra com nota + registro.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">robbie show</span>
+        <p>O painel: histórico de sessões, notas, erros por 100 palavras, contagem por tipo.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">robbie review</span>
+        <p>Revisão por repetição espaçada (SM-2) dos seus cards de vocabulário.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">robbie export</span>
+        <p>Gera um pacote <code>.apkg</code> do Anki com todos os cards, offline.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 - setup -->
+  <section class="slide">
+    <h2><span class="n">02</span>robbie setup — configuração</h2>
+    <p class="sub">Uma vez só: informa a chave da API, o provedor e escolhe o modelo numa lista.</p>
+    <div class="row">
+      <div class="grow">
+        <div class="term">
+          <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">bash</span></div>
+          <div class="tbody"><span class="t-green">$</span> robbie setup
+<span class="t-dim">Writing config to ~/.config/robbie/config.toml</span>
+LLM API key: ************
+API base URL [https://api.deepseek.com]:
+<span class="t-dim">Select a model:</span>
+  <span class="t-cyan">1.</span> deepseek-v4-flash
+  <span class="t-cyan">2.</span> deepseek-chat
+  <span class="t-cyan">3.</span> deepseek-reasoner
+  <span class="t-cyan">4.</span> custom
+Model [1-4] (default 1): <span class="t-white">1</span>
+<span class="t-green">saved /home/you/.config/robbie/config.toml (chmod 600)</span></div>
+        </div>
+      </div>
+      <ul class="bullets" style="max-width:340px;">
+        <li>Compatível com qualquer API estilo OpenAI: DeepSeek, OpenAI, OpenRouter…</li>
+        <li>Chave nunca vai pro repositório — só via env var ou arquivo local <code>chmod 600</code>.</li>
+        <li>Provedor escolhido automaticamente pela URL base.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4 - activate: chat -->
+  <section class="slide">
+    <h2><span class="n">03</span>robbie activate — o chat</h2>
+    <p class="sub">Você digita normal; o Robbie corrige na hora, no fluxo da conversa, e nunca deixa erro passar (modo casual).</p>
+    <div class="term">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">robbie activate — session 2026-08-21-01 · mode casual</span></div>
+      <div class="tbody"><span class="t-cyan">you&gt;</span> I'll compete on both gi and no-gi at the tournament.
+<span class="t-green">robbie&gt;</span> <span class="t-yellow">"Compete on"</span> → <span class="t-green">"compete in"</span> — prepositions again.
+  "I'll compete <span class="t-white">in</span> both gi and no-gi."
+<span class="t-cyan">you&gt;</span> But I still didn't decide if I'm ready.
+<span class="t-green">robbie&gt;</span> With "still", reach for the present perfect: <span class="t-white">"I still haven't decided"</span>.
+<span class="t-cyan">you&gt;</span> My back is (enferrujado?) after the break.
+<span class="t-green">robbie&gt;</span> <span class="t-yellow">"Enferrujado"</span> → <span class="t-white">"rusty"</span>. Added to your vocab cards.</div>
+    </div>
+    <ul class="bullets" style="margin-top:12px;">
+      <li>Streaming estilizado com <code>rich</code> — a resposta chega rolando na tela.</li>
+      <li>Conta suas palavras em tempo real (não é estimativa).</li>
+      <li>Saia com <code>/quit</code> ou apenas diga "let's wrap up".</li>
+      <li>Se o PostgreSQL não estiver no ar, ele sobe via <code>docker compose up -d</code> sozinho.</li>
+    </ul>
+  </section>
+
+  <!-- 5 - activate: wrap-up -->
+  <section class="slide">
+    <h2><span class="n">04</span>No encerramento: fatos + nota</h2>
+    <p class="sub">O coach emite o registro da sessão em JSON (validado), e o app calcula tudo de forma determinística.</p>
+    <div class="row">
+      <div class="grow">
+        <div class="term">
+          <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">wrap-up — rating computado pelo código</span></div>
+          <div class="tbody"><span class="t-dim">[italic] wrapping up…</span>
+<span class="t-green">rating 7.2/10</span>, 2 errors, 45 words, 4.44 errors/100 words
+
+<span class="t-white">errors:</span>
+  <span class="t-yellow">I dont buy nothing</span> → <span class="t-green">I didn't buy anything</span> (grammar)
+
+<span class="t-white">vocab gaps:</span>
+  <span class="t-cyan">atualizar</span> → update  <span class="t-dim">I need to (atualize?) my plans</span>
+
+<span class="t-cyan">vocab cards:</span> 1 gapped pair(s) upserted — try `robbie review`</div>
+        </div>
+      </div>
+      <ul class="bullets" style="max-width:340px;">
+        <li>A <b>nota nunca é persistida</b> — é recalculada dos fatos a cada leitura.</li>
+        <li>Erros e lacunas de vocabulário aparecem na tela, sempre.</li>
+        <li>Sessão salva no PostgreSQL + resumo anexado ao log.</li>
+        <li>JSON quebrou? Ele tenta de novo (até 3 vezes).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6 - vocab gaps -->
+  <section class="slide">
+    <h2><span class="n">05</span>Lacunas de vocabulário — "(atualize?)"</h2>
+    <p class="sub">Quando você trava no meio da frase e apela pro português, escreva com <code>(?)</code> — o Robbie ensina e a lacuna vira card.</p>
+    <div class="term">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">robbie activate — inside a session</span></div>
+      <div class="tbody"><span class="t-cyan">you&gt;</span> I need to (atualize?) my plans for the trip.
+<span class="t-green">robbie&gt;</span> "Atualizar" → <span class="t-white">update</span>.
+  "I need to <span class="t-white">update</span> my plans for the trip."
+  I'll add that one to your cards. Keep going!</div>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <div class="card" style="flex:1;">
+        <h3 style="color:var(--accent2); font-size:.95rem; margin-bottom:4px;">Frente do card</h3>
+        <p class="mono">atualizar</p>
+      </div>
+      <div class="card" style="flex:1;">
+        <h3 style="color:var(--accent2); font-size:.95rem; margin-bottom:4px;">Verso do card</h3>
+        <p class="mono">update<br><span class="t-dim">· I need to (atualize?) my plans</span></p>
+      </div>
+      <div class="card" style="flex:1;">
+        <h3 style="color:var(--accent2); font-size:.95rem; margin-bottom:4px;">No banco</h3>
+        <p>contexto + primeira/última vez + nº de vezes que travou + estado do SM-2</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 - modos -->
+  <section class="slide">
+    <h2><span class="n">06</span>Modos do coach</h2>
+    <p class="sub">Um modo por sessão, escolhido na hora de começar — salvo junto com a sessão para comparar notas por modo.</p>
+    <div class="term" style="max-width:560px;">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">escolhendo o modo</span></div>
+      <div class="tbody"><span class="t-green">$</span> robbie activate <span class="t-yellow">--mode formal</span>
+<span class="t-dim">╭ session 2026-08-21-02 — mode formal. talk to me. type /quit to wrap up. ╮</span></div>
+    </div>
+    <div class="grid" style="margin-top:14px;">
+      <div class="card">
+        <span class="cmd">casual (padrão)</span>
+        <p>Conversa como amigo e corrige em toda resposta. Regra dura: nunca deixar erro passar despercebido.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">formal</span>
+        <p>Registro profissional: inglês escrito, deslizes de registro e frases que soam rudes em ocasiões formais.</p>
+      </div>
+      <div class="card">
+        <span class="cmd">interview</span>
+        <p>Entrevista estruturada: um tema, uma pergunta por vez, revisão da sua resposta, ataque aos seus pontos fracos.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 - show -->
+  <section class="slide">
+    <h2><span class="n">07</span>robbie show — o painel</h2>
+    <p class="sub">Todo o histórico vira consulta, não contador editado à mão. "Quantos erros de preposição?" é um <code>group by</code>.</p>
+    <div class="term">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">robbie show</span></div>
+      <div class="tbody">session        date         mode        words  rating  err/100w  topics
+--------------------------------------------------------------------------
+2026-08-21-01  2026-08-21  casual         45    7.2      4.44   shopping
+2026-08-20-02  2026-08-20  formal        120    8.1      1.67   meeting, report
+2026-08-19-01  2026-08-19  interview      98    6.5      3.06   job interview
+2026-08-18-01  2026-08-18  casual         63    8.8      0.00   weekend plans
+--------------------------------------------------------------------------
+<span class="t-dim">lifetime counts by type:</span> <span class="t-cyan">{'grammar': 14, 'transfer': 9, 'typo': 5, 'style': 2}</span></div>
+    </div>
+    <div class="example"><b>erros/100 palavras</b> = erros ÷ palavras × 100. Como a contagem de palavras é feita pelo app, o número é fato, não estimativa.</div>
+  </section>
+
+  <!-- 9 - review -->
+  <section class="slide">
+    <h2><span class="n">08</span>robbie review — repetição espaçada</h2>
+    <p class="sub">Motor SM-2 próprio (o algoritmo do Anki): vê a frente, tenta responder de cabeça, revela o verso e avalia de <b>Again</b> a <b>Easy</b>.</p>
+    <div class="row">
+      <div class="grow">
+        <div class="term">
+          <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">robbie review — 3 cards due</span></div>
+          <div class="tbody"><span class="t-dim">────────────────────────── atualizar ──────────────────────────</span>
+<span class="t-dim">(answer any key to reveal)…</span>
+<span class="t-white">→ update</span>
+  <span class="t-dim">· I need to (atualize?) my plans</span>
+<span class="t-dim">2x gapped · learning · interval 3d · ease 2.50</span>
+grade: <span class="t-cyan">[a]gain [h]ard [g]ood [e]asy</span> (or 1-4), <span class="t-cyan">[q]uit</span> → <span class="t-white">g</span>
+<span class="t-dim">────────────────────────── anexar ──────────────────────────</span>
+<span class="t-green">done — reviewed 3 of 3 due card(s)</span></div>
+        </div>
+      </div>
+      <ul class="bullets" style="max-width:340px;">
+        <li>Cards atrasados aparecem; intervalos crescem com <code>interval × ease</code>.</li>
+        <li>Cards novos vencem na hora.</li>
+        <li>Avaliação muda o <b>estado SM-2</b> salvo no card.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 10 - export -->
+  <section class="slide">
+    <h2><span class="n">09</span>robbie export — Anki sem o Anki</h2>
+    <p class="sub">Gera um pacote pronto para importar no Anki — totalmente offline, via <code>genanki</code>.</p>
+    <div class="term" style="max-width:560px;">
+      <div class="tbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="tt">bash</span></div>
+      <div class="tbody"><span class="t-green">$</span> robbie export
+<span class="t-green">exported 24 card(s) to robbie_vocab.apkg</span></div>
+    </div>
+    <div class="grid" style="margin-top:14px;">
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:.95rem;">Deck</h3>
+        <p class="mono">Robbie::English</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:.95rem;">Frente</h3>
+        <p>a palavra que você esqueceu (ex.: <code>atualizar</code>)</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:.95rem;">Verso</h3>
+        <p>palavra em inglês + todos os contextos em que você travou</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:.95rem;">Mão única</h3>
+        <p>exportar nunca altera sua coleção <code>cards</code></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 - nota -->
+  <section class="slide">
+    <h2><span class="n">10</span>A nota, explicada</h2>
+    <p class="sub">Nota de 0 a 10, nunca armazenada — recalculada dos fatos da sessão a cada leitura.</p>
+    <div class="mono" style="background:#0b1015; border:1px solid var(--border); border-radius:10px; padding:14px 18px; color:var(--code); margin-bottom:16px; font-size:.95rem;">nota = clamp( 10 - soma(penalidades), 0, 10 )</div>
+    <table>
+      <thead><tr><th>Tipo de erro</th><th>Peso</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td class="type-g">grammar</td><td>1.0</td><td>estrutura errada</td></tr>
+        <tr><td class="type-t">transfer</td><td>0.6</td><td>interferência do português → inglês</td></tr>
+        <tr><td class="type-p">typo</td><td>0.3</td><td>erro de digitação / escorregão</td></tr>
+        <tr><td class="type-s">style</td><td>0.0</td><td>válido mas não natural — nunca desconta</td></tr>
+      </tbody>
+    </table>
+    <div class="example">
+      <b>Exemplo:</b> 5 transferências (5×0.6) + 1 grammar (1.0) + 1 transferência autocorrigida (0.3) + 1 typo (0.3) = penalidade 4.6 → <span class="mono">nota 5.4</span>.
+      Erro autocorrigido vale metade do peso — reconhecer o próprio erro merece crédito.
+    </div>
+  </section>
+
+  <!-- 12 - Obrigado -->
+  <section class="slide thanks">
+    <div class="mono" style="color:var(--accent); font-size:1.05rem; margin-bottom:14px;">robbie&gt; boa sessão. até amanhã!</div>
+    <h1 style="font-size:2.2rem;">Obrigado!</h1>
+    <p class="sub" style="font-size:1.05rem; margin-top:6px;">Python · PostgreSQL · LLM API · SM-2 · repetição espaçada · 100% offline</p>
+    <div class="mono" style="color:var(--accent2); font-size:.95rem; margin-top:18px;">robbie activate --mode interview</div>
+  </section>
+
+</div>
+
+<div class="hint">setas ← → / espaço para navegar · clique também funciona</div>
+<div class="counter" id="counter">1 / 12</div>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var total = slides.length;
+    var current = 0;
+    var counter = document.getElementById('counter');
+    var progress = document.getElementById('progress');
+
+    function show(i) {
+      current = Math.max(0, Math.min(total - 1, i));
+      slides.forEach(function (s, idx) { s.classList.toggle('active', idx === current); });
+      counter.textContent = (current + 1) + ' / ' + total;
+      progress.style.width = ((current + 1) / total * 100) + '%';
+    }
+
+    function next() { show(current + 1); }
+    function prev() { show(current - 1); }
+
+    document.addEventListener('keydown', function (e) {
+      switch (e.key) {
+        case 'ArrowRight': case ' ': case 'PageDown': e.preventDefault(); next(); break;
+        case 'ArrowLeft': case 'PageUp': e.preventDefault(); prev(); break;
+        case 'Home': show(0); break;
+        case 'End': show(total - 1); break;
+      }
+    });
+
+    var startX = null;
+    document.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; });
+    document.addEventListener('touchend', function (e) {
+      if (startX === null) return;
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); }
+      startX = null;
+    });
+
+    document.addEventListener('click', function (e) {
+      var x = e.clientX;
+      if (x < window.innerWidth / 2) { prev(); } else { next(); }
+    });
+
+    show(0);
+  })();
+</script>
+
+</body>
+</html>

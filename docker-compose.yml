@@ -1,24 +1,27 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: robbie-mongo
+  postgres:
+    image: postgres:17
+    container_name: robbie-postgres
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-robbie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-robbie}
+      POSTGRES_DB: ${POSTGRES_DB:-robbie}
     volumes:
-      - robbie-mongo-data:/data/db
+      - robbie-postgres-data:/var/lib/postgresql/data
 
-  mongo-express:
-    image: mongo-express:latest
-    container_name: robbie-mongo-express
+  adminer:
+    image: adminer:latest
+    container_name: robbie-adminer
     restart: unless-stopped
     depends_on:
-      - mongo
+      - postgres
     ports:
-      - "8081:8081"
+      - "8081:8080"
     environment:
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_PORT: "27017"
+      ADMINER_DEFAULT_SERVER: postgres
 
 volumes:
-  robbie-mongo-data:
+  robbie-postgres-data:

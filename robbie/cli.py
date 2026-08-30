@@ -4,8 +4,6 @@ Usage:
   robbie activate     start an interactive coach session
   robbie setup        write your LLM config (~/.config/robbie/config.toml)
   robbie show         dashboard: sessions, ratings, errors per 100 words
-  robbie load         load session files into MongoDB
-  robbie rules        sync rules catalog into MongoDB
   robbie review       spaced-repetition review of your vocab-gap cards
   robbie export       build an Anki .apkg from the vocab cards
 """
@@ -13,13 +11,12 @@ Usage:
 import argparse
 import getpass
 import sys
-from pathlib import Path
 
 from .activate import activate
 from .config import DEFAULT_BASE_URL, DEFAULT_MODEL, ConfigError, write_config
 from .db import DBError, RobbieDB
 from .export import build_deck, export
-from .parser import MODES, SchemaError, parse_session_file
+from .parser import MODES
 from .review import review
 
 
@@ -67,7 +64,7 @@ def _pick_model(base_url: str) -> str:
 
 
 def cmd_setup(args) -> int:
-    print(f"Writing config to ~/.config/robbie/config.toml")
+    print("Writing config to .env")
     api_key = getpass.getpass("LLM API key: ").strip()
     if not api_key:
         print("robbie: no key given, aborting", file=sys.stderr)
@@ -83,24 +80,6 @@ def cmd_setup(args) -> int:
     return 0
 
 
-def cmd_load(args) -> int:
-    db = RobbieDB()
-    paths = args.files or sorted(Path("sessions").glob("*.json"))
-    loaded = 0
-    for p in paths:
-        try:
-            session = parse_session_file(p)
-        except SchemaError as exc:
-            print(f"SKIP {p}: {exc}", file=sys.stderr)
-            continue
-        db.upsert_session(session)
-        n_cards = db.sync_cards_from_session(session)
-        print(f"loaded {p} ({session.session_id}, rating {session.rating():.1f}, {n_cards} vocab card(s))")
-        loaded += 1
-    db.close()
-    return 0
-
-
 def cmd_show(args) -> int:
     db = RobbieDB()
     print(f"{'session':<14} {'date':<12} {'mode':<10} {'words':>5} {'rating':>6} {'err/100w':>9}  topics")
@@ -110,21 +89,7 @@ def cmd_show(args) -> int:
         per_100_s = f"{per_100:.2f}" if per_100 is not None else "—"
         print(f"{s.session_id:<14} {s.date:<12} {s.mode:<10} {s.word_count:>5} {s.rating():>6.1f} {per_100_s:>9}  {', '.join(s.topics)}")
     print("-" * 80)
-    print("lifetime counts by rule:", db.counts_by_rule())
     print("lifetime counts by type:", db.counts_by_type())
-    db.close()
-    return 0
-
-
-def cmd_rules(args) -> int:
-    db = RobbieDB()
-    summary = db.sync_rules(args.file)
-    print(f"synced {summary['rules']} rules from {args.file}")
-    orphans = summary["orphan_rule_ids"]
-    if orphans:
-        print(f"WARNING: rule_ids in errors without a catalog entry: {', '.join(orphans)}")
-    else:
-        print("all rule_ids in errors have a catalog entry")
     db.close()
     return 0
 
@@ -162,10 +127,6 @@ def main() -> int:
     p_setup = sub.add_parser("setup", help="write your LLM config")
     p_setup.set_defaults(func=cmd_setup)
 
-    p_load = sub.add_parser("load", help="load session files into MongoDB")
-    p_load.add_argument("files", nargs="*", help="session JSON files (default: sessions/*.json)")
-    p_load.set_defaults(func=cmd_load)
-
     p_show = sub.add_parser("show", help="show stored sessions with recomputed ratings")
     p_show.set_defaults(func=cmd_show)
 
@@ -180,15 +141,6 @@ def main() -> int:
         help="output .apkg path (default: robbie_vocab.apkg)",
     )
     p_export.set_defaults(func=cmd_export)
-
-    p_rules = sub.add_parser("rules", help="sync rules collection from common_mistakes.md")
-    p_rules.add_argument(
-        "file",
-        nargs="?",
-        default="robbie_brain/common_mistakes.md",
-        help="rules catalog path (default: robbie_brain/common_mistakes.md)",
-    )
-    p_rules.set_defaults(func=cmd_rules)
 
     args = parser.parse_args()
     try:

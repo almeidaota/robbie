@@ -1,20 +1,22 @@
-"""Robbie config: LLM credentials and settings.
+"""Robbie config: all credentials live in the repo-root .env file.
 
 Resolution order (later wins):
   1. defaults below
-  2. ~/.config/robbie/config.toml (written by `robbie setup`)
-  3. env vars: LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+  2. values in .env (loaded via python-dotenv, with no override)
+  3. already-set environment variables always win
 
-The config file holds your API key — it's in your home dir, never in the repo.
+The .env holds the API key — it's gitignored, never in the repo.
+`robbie setup` writes/updates it interactively (chmod 600).
 """
 
 import os
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "robbie"
-CONFIG_FILE = CONFIG_DIR / "config.toml"
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+ENV_FILE = ROOT_DIR / ".env"
 
 DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-v4-flash"
@@ -33,41 +35,61 @@ class ConfigError(RuntimeError):
     """Raised when the config can't be found or parsed."""
 
 
-def load_config(path: Path | None = None) -> Config:
-    config_file = path or CONFIG_FILE
-    file_data: dict = {}
-    if config_file.exists():
-        try:
-            with config_file.open("rb") as f:
-                file_data = tomllib.load(f)
-        except (tomllib.TOMLDecodeError, OSError) as exc:
-            raise ConfigError(f"cannot read {config_file}: {exc}") from exc
-
-    llm = file_data.get("llm", {})
-    api_key = os.environ.get("LLM_API_KEY") or llm.get("api_key", "")
-    base_url = os.environ.get("LLM_BASE_URL") or llm.get("base_url", DEFAULT_BASE_URL)
-    model = os.environ.get("LLM_MODEL") or llm.get("model", DEFAULT_MODEL)
+def load_config() -> Config:
+    """Read credentials from .env + environment (env vars win)."""
+    load_dotenv(ENV_FILE, override=False)
+    api_key = os.environ.get("LLM_API_KEY", "")
+    base_url = os.environ.get("LLM_BASE_URL", DEFAULT_BASE_URL)
+    model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
 
     if not api_key:
         raise ConfigError(
-            "no LLM API key found — run `robbie setup` or set LLM_API_KEY"
+            "no LLM API key found — run `robbie setup` or set LLM_API_KEY in .env"
         )
     return Config(api_key=api_key, base_url=base_url, model=model)
 
 
-def write_config(api_key: str, base_url: str, model: str, path: Path | None = None) -> Path:
-    """Write the config (chmod 600 — it holds a secret)."""
-    target = path or CONFIG_FILE
+def write_config(
+    api_key: str,
+    base_url: str,
+    model: str,
+    path: Path | None = None,
+) -> Path:
+    """Write or update the .env with the LLM settings (chmod 600)."""
+    target = path or ENV_FILE
     target.parent.mkdir(parents=True, exist_ok=True)
-    content = (
-        f'[llm]\napi_key = {_toml_str(api_key)}\n'
-        f"base_url = {_toml_str(base_url)}\n"
-        f"model = {_toml_str(model)}\n"
-    )
-    target.write_text(content, encoding="utf-8")
+
+    load_dotenv(target, override=False)
+    updates = {
+        "LLM_API_KEY": api_key,
+        "LLM_BASE_URL": base_url,
+        "LLM_MODEL": model,
+    }
+
+    lines = _read_env_lines(target)
+    keys = set(updates)
+    out: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            out.append(line)
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in keys:
+            out.append(f"{key}={updates[key]}")
+            keys.discard(key)
+        else:
+            out.append(line)
+    for key in keys:
+        out.append(f"{key}={updates[key]}")
+
+    target.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
     target.chmod(0o600)
     return target
 
 
-def _toml_str(value: str) -> str:
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+def _read_env_lines(path: Path) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return []

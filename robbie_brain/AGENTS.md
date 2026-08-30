@@ -5,7 +5,7 @@ voice and focus change with the active mode (casual / formal / interview) —
 read the "Active mode" section below and follow it.
 
 You run inside `robbie activate`. The app injects your memory at session start
-(profile, rules, recent sessions) — you don't need to read files yourself.
+(profile, recent sessions) — you don't need to read files yourself.
 
 ## Correction Protocol (all modes)
 
@@ -33,7 +33,7 @@ wrap-up for you.
 
 ## What the app does (not you)
 
-- Counts my words, stores the session, syncs the rules catalog, computes the
-  rating and counters, appends a summary to session_log.md.
+- Counts my words, stores the session, computes the rating, appends a summary
+  to session_log.md.
 - If your JSON fails validation, the app will show you the error and ask you
   to resend it.

@@ -12,11 +12,12 @@ from pathlib import Path
 from .db import RobbieDB
 from .parser import DEFAULT_MODE, MODES, SchemaError, parse_session
 
-BRAIN_DIR = Path("robbie_brain")
+# Repo root, resolved from this file — robbie works no matter where it's run.
+ROOT_DIR = Path(__file__).resolve().parents[1]
+BRAIN_DIR = ROOT_DIR / "robbie_brain"
 AGENTS_FILE = BRAIN_DIR / "AGENTS.md"
 MODE_AGENTS_DIR = BRAIN_DIR / "agents"
 PROFILE_FILE = BRAIN_DIR / "profile.md"
-RULES_FILE = BRAIN_DIR / "common_mistakes.md"
 SESSION_LOG_FILE = BRAIN_DIR / "session_log.md"
 WRAP_UP_PROMPT_FILE = BRAIN_DIR / "wrap_up_prompt.md"
 
@@ -54,10 +55,6 @@ class Coach:
         if profile:
             parts.append("## Learner profile\n" + profile)
 
-        rules = self._rules_with_counts()
-        if rules:
-            parts.append("## Active rules with lifetime counts\n" + rules)
-
         recent = self._recent_sessions()
         if recent:
             parts.append("## Last sessions\n" + recent)
@@ -70,21 +67,6 @@ class Coach:
             "line. The app reads that marker and starts the session wrap-up."
         )
         return "\n\n".join(parts)
-
-    def _rules_with_counts(self) -> str:
-        counts = self._db.counts_by_rule()
-        if not counts:
-            return ""
-        lines = []
-        for doc in self._db.rules.find({"section": "active"}):
-            rid = doc["rule_id"]
-            if rid not in counts:
-                continue
-            lines.append(
-                f"- [{rid}] {doc['title']} — {counts[rid]}x: "
-                f"{doc['wrong'][:60]} → {doc['right'][:60]}"
-            )
-        return "\n".join(lines)
 
     def _recent_sessions(self) -> str:
         sessions = list(self._db.all_sessions())[-2:]

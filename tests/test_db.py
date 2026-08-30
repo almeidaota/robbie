@@ -1,21 +1,20 @@
 import unittest
-from unittest.mock import patch
 
 from robbie.parser import ErrorEntry, Session, VocabGap
 from robbie.db import DBError, RobbieDB
 
 
-def make_session(session_id="2026-08-21-01", with_errors=True, mode="casual"):
+def make_session(session_id="2026-08-21-01", with_errors=True, mode="casual", date="2026-08-21"):
     return Session(
         session_id=session_id,
-        date="2026-08-21",
+        date=date,
         mode=mode,
         topics=["schema design"],
         notes="test",
         word_count=150,
         errors=[
-            ErrorEntry("2", "transfer", "store the file into a database", "store the file in a database"),
-            ErrorEntry("6", "grammar", "a very good day", "a very good day", self_caught=True),
+            ErrorEntry("transfer", "store the file into a database", "store the file in a database"),
+            ErrorEntry("grammar", "a very good day", "a very good day", self_caught=True),
         ]
         if with_errors
         else [],
@@ -33,16 +32,13 @@ class TestRobbieDB(unittest.TestCase):
         cls.store.close()
 
     def setUp(self):
-        self.store.db.drop_collection("sessions")
-        self.store.db.drop_collection("errors")
-        self.store.db.drop_collection("cards")
+        self.store.clear()
 
     def test_round_trip(self):
         self.store.upsert_session(make_session())
         got = self.store.get_session("2026-08-21-01")
         self.assertIsNotNone(got)
         self.assertEqual(got.rating(), 10.0 - (0.6 + 1.0 * 0.5))
-        self.assertEqual(got.counts_by_rule(), {"2": 1, "6": 1})
         self.assertEqual(got.word_count, 150)
         self.assertEqual(got.vocab_gaps[0].l1_word, "substituir")
 
@@ -50,20 +46,27 @@ class TestRobbieDB(unittest.TestCase):
         self.store.upsert_session(make_session(mode="formal"))
         got = self.store.get_session("2026-08-21-01")
         self.assertEqual(got.mode, "formal")
-        doc = self.store.sessions.find_one({"_id": "2026-08-21-01"})
-        self.assertEqual(doc["mode"], "formal")
+        row = self.store._conn.execute(
+            "SELECT mode FROM sessions WHERE session_id = %s", ("2026-08-21-01",)
+        ).fetchone()
+        self.assertEqual(row["mode"], "formal")
 
     def test_upsert_replaces(self):
         self.store.upsert_session(make_session(with_errors=True))
         self.store.upsert_session(make_session(with_errors=False))
         got = self.store.get_session("2026-08-21-01")
         self.assertEqual(got.errors, [])
-        self.assertEqual(list(self.store.errors.find({"session_id": "2026-08-21-01"})), [])
+        rows = self.store._conn.execute(
+            "SELECT * FROM errors WHERE session_id = %s", ("2026-08-21-01",)
+        ).fetchall()
+        self.assertEqual(rows, [])
 
     def test_rating_not_stored(self):
         self.store.upsert_session(make_session())
-        doc = self.store.sessions.find_one({"_id": "2026-08-21-01"})
-        self.assertNotIn("rating", doc)
+        row = self.store._conn.execute(
+            "SELECT * FROM sessions WHERE session_id = %s", ("2026-08-21-01",)
+        ).fetchone()
+        self.assertNotIn("rating", row)
 
     def test_all_sessions_sorted(self):
         self.store.upsert_session(make_session("2026-08-20-01"))
@@ -75,24 +78,18 @@ class TestRobbieDB(unittest.TestCase):
         self.store.upsert_session(make_session())
         self.assertEqual(self.store.counts_by_type(), {"transfer": 1, "grammar": 1})
 
+    def test_session_ids_on(self):
+        self.store.upsert_session(make_session("2026-08-20-01", date="2026-08-20"))
+        self.store.upsert_session(make_session("2026-08-21-01"))
+        self.store.upsert_session(make_session("2026-08-21-02"))
+        self.assertEqual(
+            self.store.session_ids_on("2026-08-21"),
+            ["2026-08-21-01", "2026-08-21-02"],
+        )
+
     def test_unreachable_raises(self):
         with self.assertRaises(DBError):
-            RobbieDB(uri="mongodb://localhost:1")
-
-    def test_sync_rules_replaces_and_finds_orphans(self):
-        self.store.sync_rules("robbie_brain/common_mistakes.md")
-        n = self.store.rules.count_documents({})
-        self.assertEqual(n, 23)
-        r2 = self.store.rules.find_one({"_id": "2"})
-        self.assertEqual(r2["times_repeated"], 10)
-
-        self.store.upsert_session(make_session())
-        orphans = self.store.orphan_rule_ids()
-        self.assertIn("2", self.store.rules.distinct("rule_id"))
-        self.assertNotIn("2", orphans)
-
-        self.store.errors.insert_one({"session_id": "2026-08-21-01", "rule_id": "nope"})
-        self.assertEqual(self.store.orphan_rule_ids(), ["nope"])
+            RobbieDB(dsn="postgresql://localhost:1/robbie")
 
 
 class TestCards(unittest.TestCase):
@@ -105,7 +102,7 @@ class TestCards(unittest.TestCase):
         cls.store.close()
 
     def setUp(self):
-        self.store.db.drop_collection("cards")
+        self.store.clear()
 
     def gap_session(self, session_id="2026-08-21-01", date="2026-08-21"):
         return Session(
@@ -170,6 +167,11 @@ class TestCards(unittest.TestCase):
         self.assertEqual(len(self.store.due_cards("2026-08-22")), 2)
         self.assertEqual(self.store.due_cards("2026-08-20"), [])
 
+    def test_count_due_cards(self):
+        self.store.sync_cards_from_session(self.gap_session())
+        self.assertEqual(self.store.count_due_cards("2026-08-22"), 2)
+        self.assertEqual(self.store.count_due_cards("2026-08-20"), 0)
+
     def test_review_advances_state(self):
         self.store.sync_cards_from_session(self.gap_session())
         card = self.store.review_card("substituir->replace", "good", "2026-08-22")
@@ -189,11 +191,11 @@ class TestCards(unittest.TestCase):
 
     def test_suspended_cards_not_due(self):
         self.store.sync_cards_from_session(self.gap_session())
-        self.store.cards.update_one(
-            {"_id": "substituir->replace"}, {"$set": {"suspended": True}}
+        self.store._conn.execute(
+            "UPDATE cards SET suspended = TRUE WHERE slug = %s", ("substituir->replace",)
         )
         due = self.store.due_cards("2026-08-22")
-        self.assertEqual([d["_id"] for d in due], ["atualize->update"])
+        self.assertEqual([d["slug"] for d in due], ["atualize->update"])
 
 
 if __name__ == "__main__":

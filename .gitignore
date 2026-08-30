@@ -1,12 +1,12 @@
 # Personal data — never in the repo (brainstorm: "code open, data private")
 */profile.md
 */session_log.md
-*/common_mistakes.md
 sessions/
 
-# Secrets — keys live in env vars or ~/.config/robbie/config.toml, never here
+# Secrets — keys and credentials live in .env, never here
 .env
 .env.*
+!.env.example
 
 # Python
 __pycache__/

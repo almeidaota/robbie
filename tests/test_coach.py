@@ -40,11 +40,11 @@ class FakeLLM:
 
 GOOD_JSON = (
     '{"schema_version": 1, "session_id": "2026-08-21-99", "date": "2026-08-21", '
-    '"topics": ["testing"], "notes": "n", "errors": [{"rule_id": "2", "type": "transfer", '
+    '"topics": ["testing"], "notes": "n", "errors": [{"type": "transfer", '
     '"quote": "q", "fix": "f", "self_caught": false}], "vocab_gaps": []}'
 )
 
-BAD_JSON = '{"schema_version": 1, "session_id": "2026-08-21-99", "date": "2026-08-21", "errors": [{"rule_id": "2", "type": "wrong-type", "quote": "q", "fix": "f"}]}'
+BAD_JSON = '{"schema_version": 1, "session_id": "2026-08-21-99", "date": "2026-08-21", "errors": [{"type": "wrong-type", "quote": "q", "fix": "f"}]}'
 
 
 class TestModeSwitching(unittest.TestCase):
@@ -57,6 +57,9 @@ class TestModeSwitching(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.db.close()
+
+    def setUp(self):
+        self.db.clear()
 
     def test_mode_defaults_to_casual(self):
         from robbie.coach import Coach
@@ -90,12 +93,13 @@ class TestWrapUp(unittest.TestCase):
         from robbie.db import RobbieDB
 
         cls.db = RobbieDB(db_name="robbie_test")
-        cls.db.db.drop_collection("sessions")
-        cls.db.db.drop_collection("errors")
 
     @classmethod
     def tearDownClass(cls):
         cls.db.close()
+
+    def setUp(self):
+        self.db.clear()
 
     def test_valid_json_accepted_first_try(self):
         from robbie.coach import Coach

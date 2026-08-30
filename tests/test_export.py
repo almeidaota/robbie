@@ -8,7 +8,7 @@ from robbie.export import _contexts_html, build_deck, export
 
 def card(slug, l1, target, contexts, suspended=False):
     return {
-        "_id": slug,
+        "slug": slug,
         "l1_word": l1,
         "target_word": target,
         "contexts": [{"session_id": "s", "date": "d", "context": c} for c in contexts],

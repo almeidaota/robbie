@@ -54,9 +54,7 @@ def review() -> int:
             reviewed += 1
 
         console.print(f"\n[bold]done[/] — reviewed {reviewed} of {len(cards)} due card(s)")
-        next_due = db.cards.count_documents(
-            {"due_date": {"$lte": today}, "suspended": False}
-        )
+        next_due = db.count_due_cards(today)
         if next_due:
             console.print(f"[dim]{next_due} card(s) still due — run `robbie review` again[/]")
         return 0
@@ -65,7 +63,7 @@ def review() -> int:
 
 
 def _review_one(db, card: dict, today: str) -> bool:
-    slug = card["_id"]
+    slug = card["slug"]
     console.print()
     console.rule(f"[bold]{card['l1_word']}[/]", style="cyan")
     try:

@@ -1,16 +1,16 @@
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from robbie.activate import (
     _connect_db,
     _count_words,
     _has_wrap_marker,
+    _show_session_facts,
     _strip_wrap_marker,
     next_session_id,
 )
 from robbie.db import DBError
+from robbie.parser import ErrorEntry, Session, VocabGap
 
 
 class TestActivateHelpers(unittest.TestCase):
@@ -25,22 +25,52 @@ class TestActivateHelpers(unittest.TestCase):
         self.assertEqual(_strip_wrap_marker("bye\n<wrap_up>"), "bye\n")
 
     def test_next_session_id_counts_existing(self):
-        with TemporaryDirectory() as tmp:
-            sessions = Path(tmp)
-            (sessions / "2026-08-21-01.json").write_text("{}")
-            (sessions / "2026-08-21-02.json").write_text("{}")
-            with patch("robbie.activate.SESSIONS_DIR", sessions):
-                with patch("robbie.activate.date") as mock_date:
-                    mock_date.today.return_value.isoformat.return_value = "2026-08-21"
-                    self.assertEqual(next_session_id(), "2026-08-21-03")
+        db = MagicMock()
+        db.session_ids_on.return_value = ["2026-08-21-01", "2026-08-21-02"]
+        with patch("robbie.activate.date") as mock_date:
+            mock_date.today.return_value.isoformat.return_value = "2026-08-21"
+            self.assertEqual(next_session_id(db), "2026-08-21-03")
+        db.session_ids_on.assert_called_once_with("2026-08-21")
+
+    def test_next_session_id_ignores_ids_from_other_days(self):
+        db = MagicMock()
+        db.session_ids_on.return_value = ["2026-08-20-01", "2026-08-21-02"]
+        with patch("robbie.activate.date") as mock_date:
+            mock_date.today.return_value.isoformat.return_value = "2026-08-21"
+            self.assertEqual(next_session_id(db), "2026-08-21-03")
 
     def test_next_session_id_first_of_day(self):
-        with TemporaryDirectory() as tmp:
-            sessions = Path(tmp)
-            with patch("robbie.activate.SESSIONS_DIR", sessions):
-                with patch("robbie.activate.date") as mock_date:
-                    mock_date.today.return_value.isoformat.return_value = "2026-08-22"
-                    self.assertEqual(next_session_id(), "2026-08-22-01")
+        db = MagicMock()
+        db.session_ids_on.return_value = []
+        with patch("robbie.activate.date") as mock_date:
+            mock_date.today.return_value.isoformat.return_value = "2026-08-22"
+            self.assertEqual(next_session_id(db), "2026-08-22-01")
+
+
+class TestShowSessionFacts(unittest.TestCase):
+    def test_prints_errors_and_gaps(self):
+        from unittest.mock import patch
+
+        session = Session(
+            session_id="x",
+            date="2026-08-22",
+            errors=[ErrorEntry("transfer", "wasnt", "wasn't")],
+            vocab_gaps=[VocabGap("mesmo", "actually", "(mesmo)")],
+        )
+        with patch("robbie.activate.console") as console:
+            _show_session_facts(session)
+        texts = " ".join(str(c.args) for c in console.print.call_args_list)
+        self.assertIn("wasn't", texts)
+        self.assertIn("mesmo", texts)
+        self.assertIn("actually", texts)
+
+    def test_quiet_when_no_facts(self):
+        from unittest.mock import patch
+
+        session = Session(session_id="x", date="2026-08-22")
+        with patch("robbie.activate.console") as console:
+            _show_session_facts(session)
+        console.print.assert_not_called()
 
 
 class TestConnectDb(unittest.TestCase):
