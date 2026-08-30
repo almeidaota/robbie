@@ -20,6 +20,7 @@ from .config import ConfigError, load_config
 from .db import DBError, RobbieDB
 from .llm import LLMClient, LLMError
 from .parser import DEFAULT_MODE, parse_session
+from .profile import ensure_profile
 
 console = Console()
 
@@ -84,6 +85,8 @@ def activate(mode: str = DEFAULT_MODE) -> int:
     db = _connect_db()
     if db is None:
         return 1
+
+    ensure_profile()
 
     llm = LLMClient(config)
     coach = Coach(llm, db, mode=mode)
