@@ -5,9 +5,7 @@ as they type. On /quit, asks the coach for the session JSON, validates it
 against the schema, stores it, and appends a human summary to session_log.md.
 """
 
-import subprocess
 import sys
-import time
 from datetime import date
 
 from rich.console import Console
@@ -15,8 +13,8 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .coach import BRAIN_DIR, Coach, CoachError, append_session_log
-from .config import ConfigError, ENV_FILE, ROOT_DIR, load_config
+from .coach import Coach, CoachError, append_session_log
+from .config import ConfigError, load_config
 from .db import DBError, RobbieDB
 from .llm import LLMClient, LLMError
 from .parser import DEFAULT_MODE, parse_session
@@ -38,52 +36,12 @@ def next_session_id(db: RobbieDB) -> str:
     return f"{today}-{max(counts, default=0) + 1:02d}"
 
 
-def _compose_up() -> bool:
-    """Start PostgreSQL (+ Adminer) via docker compose. True on success."""
-    console.print("[dim]starting PostgreSQL via docker compose…[/]")
-    compose_file = ROOT_DIR / "docker-compose.yml"
-    try:
-        proc = subprocess.run(
-            [
-                "docker",
-                "compose",
-                "-f",
-                str(compose_file),
-                "--project-directory",
-                str(ROOT_DIR),
-                "--env-file",
-                str(ENV_FILE),
-                "up",
-                "-d",
-            ],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        console.print("[red]robbie:[/] docker not found on PATH")
-        return False
-    if proc.returncode != 0:
-        console.print(f"[red]robbie:[/] `docker compose up -d` failed:\n{proc.stdout}{proc.stderr}")
-        return False
-    return True
-
-
-def _connect_db(max_retries: int = 5, delay: float = 1.0) -> RobbieDB | None:
-    """Connect to PostgreSQL, starting docker compose on demand if needed."""
+def _connect_db() -> RobbieDB | None:
+    """Open the local SQLite database. Returns None on failure."""
     try:
         return RobbieDB()
     except DBError as exc:
-        console.print(f"[yellow]robbie:[/] {exc}")
-        if not _compose_up():
-            console.print("is the database up? try: docker compose up -d")
-            return None
-        for attempt in range(1, max_retries + 1):
-            try:
-                return RobbieDB()
-            except DBError:
-                if attempt < max_retries:
-                    time.sleep(delay)
-        console.print("[red]robbie:[/] PostgreSQL still not reachable after `docker compose up -d`")
+        console.print(f"[red]robbie:[/] {exc}")
         return None
 
 

@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from robbie.parser import ErrorEntry, Session, VocabGap
 from robbie.db import DBError, RobbieDB
@@ -25,11 +27,13 @@ def make_session(session_id="2026-08-21-01", with_errors=True, mode="casual", da
 class TestRobbieDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.store = RobbieDB(db_name="robbie_test")
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.store = RobbieDB(dsn=Path(cls._tmp.name) / "robbie_test.db")
 
     @classmethod
     def tearDownClass(cls):
         cls.store.close()
+        cls._tmp.cleanup()
 
     def setUp(self):
         self.store.clear()
@@ -47,7 +51,7 @@ class TestRobbieDB(unittest.TestCase):
         got = self.store.get_session("2026-08-21-01")
         self.assertEqual(got.mode, "formal")
         row = self.store._conn.execute(
-            "SELECT mode FROM sessions WHERE session_id = %s", ("2026-08-21-01",)
+            "SELECT mode FROM sessions WHERE session_id = ?", ("2026-08-21-01",)
         ).fetchone()
         self.assertEqual(row["mode"], "formal")
 
@@ -57,16 +61,16 @@ class TestRobbieDB(unittest.TestCase):
         got = self.store.get_session("2026-08-21-01")
         self.assertEqual(got.errors, [])
         rows = self.store._conn.execute(
-            "SELECT * FROM errors WHERE session_id = %s", ("2026-08-21-01",)
+            "SELECT * FROM errors WHERE session_id = ?", ("2026-08-21-01",)
         ).fetchall()
         self.assertEqual(rows, [])
 
     def test_rating_not_stored(self):
         self.store.upsert_session(make_session())
         row = self.store._conn.execute(
-            "SELECT * FROM sessions WHERE session_id = %s", ("2026-08-21-01",)
+            "SELECT * FROM sessions WHERE session_id = ?", ("2026-08-21-01",)
         ).fetchone()
-        self.assertNotIn("rating", row)
+        self.assertNotIn("rating", row.keys())
 
     def test_all_sessions_sorted(self):
         self.store.upsert_session(make_session("2026-08-20-01"))
@@ -87,19 +91,21 @@ class TestRobbieDB(unittest.TestCase):
             ["2026-08-21-01", "2026-08-21-02"],
         )
 
-    def test_unreachable_raises(self):
+    def test_unwritable_path_raises(self):
         with self.assertRaises(DBError):
-            RobbieDB(dsn="postgresql://localhost:1/robbie")
+            RobbieDB(dsn=Path("/nonexistent-dir") / "robbie.db")
 
 
 class TestCards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.store = RobbieDB(db_name="robbie_test")
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.store = RobbieDB(dsn=Path(cls._tmp.name) / "robbie_test.db")
 
     @classmethod
     def tearDownClass(cls):
         cls.store.close()
+        cls._tmp.cleanup()
 
     def setUp(self):
         self.store.clear()
@@ -192,8 +198,9 @@ class TestCards(unittest.TestCase):
     def test_suspended_cards_not_due(self):
         self.store.sync_cards_from_session(self.gap_session())
         self.store._conn.execute(
-            "UPDATE cards SET suspended = TRUE WHERE slug = %s", ("substituir->replace",)
+            "UPDATE cards SET suspended = 1 WHERE slug = ?", ("substituir->replace",)
         )
+        self.store._conn.commit()
         due = self.store.due_cards("2026-08-22")
         self.assertEqual([d["slug"] for d in due], ["atualize->update"])
 

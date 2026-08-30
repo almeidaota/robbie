@@ -116,41 +116,17 @@ class TestOfferProfileUpdates(unittest.TestCase):
 
 
 class TestConnectDb(unittest.TestCase):
-    def test_connects_without_compose_when_db_is_up(self):
+    def test_connects(self):
         with patch("robbie.activate.RobbieDB") as mock_db:
             self.assertIsNotNone(_connect_db())
         mock_db.assert_called_once()
 
-    def test_starts_compose_and_retries_when_db_is_down(self):
-        db_mock = unittest.mock.MagicMock()
-        attempts = iter([DBError("down"), db_mock])
-        with (
-            patch("robbie.activate.RobbieDB", side_effect=attempts) as mock_db,
-            patch("robbie.activate._compose_up", return_value=True) as compose,
-        ):
-            self.assertIs(_connect_db(max_retries=1), db_mock)
-        compose.assert_called_once_with()
-        self.assertEqual(mock_db.call_count, 2)
-
-    def test_returns_none_when_compose_fails(self):
+    def test_returns_none_when_open_fails(self):
         with (
             patch("robbie.activate.RobbieDB", side_effect=DBError("down")),
-            patch("robbie.activate._compose_up", return_value=False) as compose,
             patch("robbie.activate.console") as console,
         ):
             self.assertIsNone(_connect_db())
-        compose.assert_called_once_with()
-        console.print.assert_called()
-
-    def test_returns_none_when_db_never_comes_up(self):
-        with (
-            patch("robbie.activate.RobbieDB", side_effect=DBError("down")),
-            patch("robbie.activate._compose_up", return_value=True),
-            patch("robbie.activate.time.sleep") as sleep,
-            patch("robbie.activate.console") as console,
-        ):
-            self.assertIsNone(_connect_db(max_retries=2, delay=1.0))
-        self.assertEqual(sleep.call_count, 1)
         console.print.assert_called()
 
 

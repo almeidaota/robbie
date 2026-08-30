@@ -17,8 +17,7 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
 
 - **`robbie activate`** — an interactive coaching chat. Streams styled replies,
   counts the words you write, and on wrap-up produces a facts-only session
-  record automatically. If PostgreSQL isn't running, it starts it via
-  `docker compose up -d` for you.
+  record automatically. Storage is a local SQLite file — no server, no Docker.
 - **Coach modes** — one mode per session, set at start with
   `robbie activate --mode formal`. `casual` always corrects; `formal` pushes a
   written/register-slip-aware workplace register; `interview` runs structured
@@ -26,7 +25,8 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
 - **Deterministic rating** — 0–10, recomputed from weights, never stored.
 - **`errors_per_100_words`** — error density, from the word count counted by
   the app (not estimated).
-- **PostgreSQL storage** — `sessions` + `errors` + `cards` tables.
+- **SQLite storage** — `sessions` + `errors` + `cards` tables in one local
+  `robbie.db` file (stdlib `sqlite3`, zero setup).
   Facts in, verdicts out (the rating is never persisted).
 - **Spaced-repetition vocab cards** — every `(l1_word?)` gap in a session
   becomes a card (`cards` table), reviewed with your own SM-2 engine via
@@ -38,8 +38,7 @@ Recognition (LLM, fuzzy)  →  session facts (JSON)  →  scoring (deterministic
 
 ## Requirements
 
-- Python 3.11+
-- Docker (for PostgreSQL via `docker compose` — see `docker-compose.yml`)
+- Python 3.11+ (sqlite3 ships with the standard library)
 - An LLM API key (OpenAI-compatible: DeepSeek, OpenAI, OpenRouter, …)
 
 ## Como rodar
@@ -58,16 +57,6 @@ Then edit `.env`. Every variable:
 | `LLM_API_KEY` | **yes** | — | `robbie/config.py` | Your LLM API key. Without it `robbie` won't start. |
 | `LLM_BASE_URL` | no | `https://api.deepseek.com` | `robbie/config.py` | OpenAI-compatible API base URL. |
 | `LLM_MODEL` | no | `deepseek-v4-flash` | `robbie/config.py` | Model to chat with. |
-| `POSTGRES_HOST` | no | `localhost` | `robbie/db.py`, `docker-compose.yml` | Where PostgreSQL listens. |
-| `POSTGRES_PORT` | no | `5432` | `robbie/db.py`, `docker-compose.yml` | PostgreSQL port. |
-| `POSTGRES_USER` | no | `robbie` | `robbie/db.py`, `docker-compose.yml` | PostgreSQL user. |
-| `POSTGRES_PASSWORD` | no | `robbie` | `robbie/db.py`, `docker-compose.yml` | PostgreSQL password. |
-| `POSTGRES_DB` | no | `robbie` | `robbie/db.py`, `docker-compose.yml` | Database name. |
-
-> **Note:** the `POSTGRES_*` values are read both by the app (`robbie/db.py`)
-> and by `docker-compose.yml`, so the container and the app always agree.
-> `MONGO_URI` (commented out in `.env.example`) was only used by the one-shot
-> Mongo→Postgres migration script, which has been removed.
 
 Setup, step by step:
 
@@ -80,18 +69,16 @@ pipx install -e .
 
 # 3. Copy and fill the env file
 cp .env.example .env
-#   edit .env: put your LLM_API_KEY and, if you changed them, the POSTGRES_* values
+#   edit .env: put your LLM_API_KEY
 
-# 4. Start PostgreSQL + the web admin (Adminer)
-docker compose up -d
-# browser UI: http://localhost:8081  (system=PostgreSQL, server=postgres,
-#             user/pass/db = your POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB)
-
-# 5. Point the CLI at your LLM (writes/updates .env interactively)
+# 4. Point the CLI at your LLM (writes/updates .env interactively)
 robbie setup
 ```
 
 Or skip `robbie setup` and just set `LLM_API_KEY` in `.env` by hand.
+
+No database to install: the first `robbie activate` creates `robbie.db` (a
+single SQLite file, gitignored) automatically.
 
 Then create your personal files from the templates:
 
@@ -126,7 +113,7 @@ robbie export       # build an Anki .apkg from the vocab cards
   done") — the coach signals the wrap-up itself.
 - On wrap-up, the coach emits the session record as JSON per the schema,
   validated by the parser (with up to 3 retries on schema errors). The app:
-  - counts your words and stores the session + errors in PostgreSQL
+  - counts your words and stores the session + errors in SQLite
   - appends a summary to `robbie_brain/session_log.md`
   - prints the rating and errors/100 words
 
@@ -184,7 +171,7 @@ robbie/
   sm2.py       # SM-2 spaced-repetition engine (pure, deterministic)
   review.py    # robbie review: grade due vocab cards
   export.py    # robbie export: build an Anki .apkg (genanki)
-  db.py        # PostgreSQL: sessions, errors, cards
+  db.py        # SQLite (stdlib sqlite3): sessions, errors, cards
 robbie_brain/  # your personal coach memory (gitignored) + *.example.md
                # agents/ holds the per-mode coach behavior (casual/formal/interview)
 tests/         # unittest suite
@@ -192,14 +179,14 @@ tests/         # unittest suite
 
 ## Storage model
 
-PostgreSQL stores **facts, never verdicts**:
+SQLite stores **facts, never verdicts** (one file, `robbie.db`):
 
 - `sessions` — one row per session (meta, topics, notes, word count,
-  vocab gaps as JSONB), keyed by `session_id`.
+  vocab gaps as JSON text), keyed by `session_id`.
 - `errors` — one row per error (type, quote, fix, self_caught), referencing
-  `session_id` (a `SERIAL id` keeps insertion order).
+  `session_id` (an autoincrement id keeps insertion order).
 - `cards` — one row per `(l1_word, target_word)` vocab-gap pair: the facts
-  (`contexts` as JSONB, `first_seen`, `last_seen`, `times_gapped`) plus the
+  (`contexts` as JSON text, `first_seen`, `last_seen`, `times_gapped`) plus the
   mutable SM-2 review state (`repetitions`, `ease_factor`, `interval_days`,
   `due_date`, `last_reviewed`). Keyed by a stable slug like
   `substituir->replace`.
@@ -211,7 +198,7 @@ group-by query, not a hand-edited counter.
 
 ```sh
 pip install -e .
-python -m unittest discover -s tests   # run the suite (needs PostgreSQL up)
+python -m unittest discover -s tests   # runs with a throwaway SQLite file
 ```
 
 ## License

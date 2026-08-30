@@ -13,3 +13,7 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+
+# SQLite database files (simplified branch)
+*.db
+*.sqlite

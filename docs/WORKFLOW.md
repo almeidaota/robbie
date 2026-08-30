@@ -1,8 +1,8 @@
 # Robbie workflow
 
 How the pieces call each other, from `robbie` on the command line to the
-PostgreSQL tables. The core loop is `activate`; the rest are small utilities
-that read or sync the same data.
+SQLite tables (one local file, `robbie.db`). The core loop is `activate`; the
+rest are small utilities that read or sync the same data.
 
 ## Entry point and bootstrap
 
@@ -38,28 +38,27 @@ WRAP_UP_PROMPT_FILE → wrap_up_prompt.md
 ```
 
 `robbie/config.py` resolves the config path once:
-`~/.config/robbie/config.toml` (or `$XDG_CONFIG_HOME/robbie/config.toml`).
+`<repo-root>/.env` (gitignored), plus real environment variables which win.
 
 ## `robbie activate` — the main workflow
 
 ```
 activate(mode)                              activate.py:82
-  1. load_config()                          config.py:36   defaults → config.toml → env vars
-  2. _connect_db()                          activate.py:63 RobbieDB() ping; on fail: docker compose up, retry 5×
+  1. load_config()                          config.py:36   defaults → .env → env vars
+  2. _connect_db()                          activate.py:44 RobbieDB() — opens the local SQLite file
   3. LLMClient(config)                      llm.py:19      OpenAI-compatible httpx client
   4. Coach(llm, db, mode=mode)              coach.py:32    validates mode ∈ {casual, formal, interview}
-  5. next_session_id(db)                    activate.py:31 YYYY-MM-DD-NN from the sessions table
-  6. history = [system: coach.system_prompt()]  activate.py:97
-     └─ loop → _wrap_up()                  activate.py:161/167
+  5. next_session_id(db)                    activate.py:27 YYYY-MM-DD-NN from the sessions table
+  6. history = [system: coach.system_prompt()]  activate.py:87
+     └─ loop → _wrap_up()                  activate.py:151/157
 ```
 
 ### Step 2 — database connection
 
-`RobbieDB.__init__` (db.py:40) connects to PostgreSQL with a 3s timeout (DSN
-from the `.env`) and creates the tables + indexes if missing: `sessions`,
-`errors`, `cards` (`errors.session_id`, `cards.due_date`). If the connect
-fails, `_connect_db` auto-runs `docker compose up -d` (`_compose_up`,
-activate.py:45) and retries 5 times at 1s intervals.
+`RobbieDB.__init__` (db.py:45) opens the local SQLite file (`robbie.db` in the
+repo root, stdlib `sqlite3`) and creates the tables + indexes if missing:
+`sessions`, `errors`, `cards` (`errors.session_id`, `cards.due_date`). No
+server, no Docker — a file that can't be opened raises `DBError`.
 
 ### Step 6 — the system prompt
 
@@ -150,7 +149,7 @@ LLM recognition (fuzzy)
 session JSON  (validated by parser.py, ≤3 retries)
    │  db.upsert_session
    ▼
-PostgreSQL (facts only)
+SQLite (facts only, robbie.db)
    ├─ sessions  ──►  rating() recomputed from WEIGHTS on every read
    ├─ errors    ──►  counts_by_type (GROUP BY)
    └─ cards     ◄── sync_cards_from_session (vocab gaps)
@@ -162,10 +161,10 @@ PostgreSQL (facts only)
 ## Storage model
 
 - `sessions` — one row per session (meta, topics, notes, word count, vocab
-  gaps as JSONB), keyed by `session_id`. Facts, never verdicts.
+  gaps as JSON text), keyed by `session_id`. Facts, never verdicts.
 - `errors` — one row per error (type, quote, fix, self_caught), referencing
-  `session_id`; a `SERIAL id` keeps insertion order.
+  `session_id`; an autoincrement id keeps insertion order.
 - `cards` — one row per `(l1_word, target_word)` pair, keyed by the stable slug
-  `sm2.card_slug` (`atualize->update`): the facts (`contexts` as JSONB,
+  `sm2.card_slug` (`atualize->update`): the facts (`contexts` as JSON text,
   `first_seen`, `last_seen`, `times_gapped`) plus the mutable SM-2 state
   (`repetitions`, `ease_factor`, `interval_days`, `due_date`, `last_reviewed`).
