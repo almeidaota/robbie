@@ -85,6 +85,16 @@ class TestConfig(unittest.TestCase):
             write_config("sk", "https://example.com", "m", env)
             self.assertEqual(os.stat(env).st_mode & 0o777, 0o600)
 
+    def test_write_config_skips_chmod_on_windows(self):
+        import os
+
+        with TemporaryDirectory() as tmp:
+            env = Path(tmp) / ".env"
+            with patch("robbie.config.os.name", "nt"):
+                write_config("sk", "https://example.com", "m", env)
+            self.assertTrue(env.exists())
+            self.assertIn("LLM_API_KEY=sk", env.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

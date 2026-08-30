@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import getpass
+import os
 import sys
 
 from .activate import activate
@@ -76,7 +77,9 @@ def cmd_setup(args) -> int:
     except OSError as exc:
         print(f"robbie: could not write config: {exc}", file=sys.stderr)
         return 1
-    print(f"saved {path} (chmod 600)")
+    print(f"saved {path}")
+    if os.name != "nt":
+        print("(permissions restricted to owner)")
     return 0
 
 

@@ -84,8 +84,18 @@ def write_config(
         out.append(f"{key}={updates[key]}")
 
     target.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
-    target.chmod(0o600)
+    _restrict_permissions(target)
     return target
+
+
+def _restrict_permissions(path: Path) -> None:
+    """Restrict .env permissions where the OS supports it (chmod is Unix-only)."""
+    if os.name == "nt":
+        return
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
 
 
 def _read_env_lines(path: Path) -> list[str]:
